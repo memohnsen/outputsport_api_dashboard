@@ -16,14 +16,20 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@nivo/bar": "^0.97.0",
+    "@nivo/core": "^0.97.0",
+    "@nivo/line": "^0.97.0",
+    "@nivo/pie": "^0.97.0",
     "@t3-oss/env-nextjs": "^0.12.0",
     "@tanstack/react-query": "^5.69.0",
     "@trpc/client": "^11.0.0",
     "@trpc/react-query": "^11.0.0",
     "@trpc/server": "^11.0.0",
+    "d3": "^7.9.0",
     "next": "^15.2.3",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "recharts": "^2.15.3",
     "server-only": "^0.0.1",
     "superjson": "^2.2.1",
     "zod": "^3.24.2"
