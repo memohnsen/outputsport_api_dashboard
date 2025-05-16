@@ -112,10 +112,8 @@ export default function DataTable({ title = "Product Data" }: DataTableProps) {
                 <td className="px-4 py-3 text-gray-300">{row.category}</td>
                 <td className="px-4 py-3 text-gray-300">${row.price.toFixed(2)}</td>
                 <td className="px-4 py-3 text-gray-300">
-                  {row.stock === null ? (
+                  {row.stock ?? (
                     <span className="text-amber-500">Out of stock</span>
-                  ) : (
-                    row.stock
                   )}
                 </td>
                 <td className="px-4 py-3 text-gray-300">{row.sales.toLocaleString()}</td>

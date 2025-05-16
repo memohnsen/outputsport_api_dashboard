@@ -1,6 +1,7 @@
 import { HydrateClient } from "@/trpc/server";
 import { Suspense } from "react";
-import AthletesList from "./AthletesList";
+import AthletesList from "src/app/athletes/AthletesList";
+import Link from "next/link";
 
 export default function AthletesPage() {
   return (
@@ -12,8 +13,8 @@ export default function AthletesPage() {
               <span className="text-[#887D2B]">Output</span> Sports Analytics
             </h1>
             <nav className="hidden space-x-8 md:flex">
-              <a href="/" className="text-[#8C8C8C] hover:text-white">Dashboard</a>
-              <a href="/athletes" className="text-white hover:text-[#887D2B]">Athletes</a>
+              <Link href="/" className="text-[#8C8C8C] hover:text-white">Dashboard</Link>
+              <Link href="/athletes" className="text-white hover:text-[#887D2B]">Athletes</Link>
             </nav>
             <button className="rounded-md bg-white/10 p-2 md:hidden">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">

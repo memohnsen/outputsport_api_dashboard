@@ -34,7 +34,7 @@ export default function AthleteList({ selectedAthlete, onAthleteSelect }: Athlet
       }
     }
 
-    fetchAthletes();
+    void fetchAthletes();
   }, []);
 
   // Fetch athlete's measurements when an athlete is selected
@@ -50,8 +50,8 @@ export default function AthleteList({ selectedAthlete, onAthleteSelect }: Athlet
         setLoadingMeasurements(true);
         const { startDate, endDate } = getLast30DaysRange();
         // Use optional chaining to prevent null reference errors
-        const athleteName = selectedAthlete?.fullName || 'Unknown';
-        const athleteId = selectedAthlete?.id || '';
+        const athleteName = selectedAthlete?.fullName ?? 'Unknown';
+        const athleteId = selectedAthlete?.id ?? '';
         
         setDebugInfo(`Fetching measurements for athlete: ${athleteName} (${athleteId})`);
         
@@ -75,7 +75,7 @@ export default function AthleteList({ selectedAthlete, onAthleteSelect }: Athlet
       }
     }
 
-    fetchAthleteMeasurements();
+    void fetchAthleteMeasurements();
   }, [selectedAthlete]);
 
   const formatDate = (dateString: string) => {
@@ -99,7 +99,7 @@ export default function AthleteList({ selectedAthlete, onAthleteSelect }: Athlet
   const handleAthleteChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     const athleteId = event.target.value;
     if (athleteId) {
-      const athlete = athletes.find(a => a.id === athleteId) || null;
+      const athlete = athletes.find(a => a.id === athleteId) ?? null;
       console.log('Selected athlete:', athlete);
       
       // Clear measurements first to prevent showing previous data
@@ -133,7 +133,7 @@ export default function AthleteList({ selectedAthlete, onAthleteSelect }: Athlet
     const categoryCounts: Record<string, number> = {};
     athleteMeasurements.forEach(m => {
       const category = m.exerciseCategory;
-      categoryCounts[category] = (categoryCounts[category] || 0) + 1;
+      categoryCounts[category] = (categoryCounts[category] ?? 0) + 1;
     });
 
     let topCategory = '';
@@ -146,7 +146,7 @@ export default function AthleteList({ selectedAthlete, onAthleteSelect }: Athlet
       }
     });
 
-    return topCategory || 'N/A';
+    return topCategory ?? 'N/A';
   };
 
   // Get the most recent measurement date and exercise
@@ -211,7 +211,7 @@ export default function AthleteList({ selectedAthlete, onAthleteSelect }: Athlet
         <select
           id="athlete-select"
           className="w-full rounded-md border-[#8C8C8C]/20 bg-[#0D0D0D]/70 px-3 py-2 text-white focus:border-[#887D2B] focus:ring focus:ring-[#887D2B]/30"
-          value={selectedAthlete?.id || ''}
+          value={selectedAthlete?.id ?? ''}
           onChange={handleAthleteChange}
         >
           <option value="">-- Select an athlete --</option>
@@ -240,7 +240,7 @@ export default function AthleteList({ selectedAthlete, onAthleteSelect }: Athlet
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div className="rounded-md bg-[#0D0D0D]/80 p-3">
               <p className="text-sm text-[#8C8C8C]">External ID</p>
-              <p className="text-white">{selectedAthlete.externalId || 'N/A'}</p>
+              <p className="text-white">{selectedAthlete.externalId ?? 'N/A'}</p>
             </div>
             <div className="rounded-md bg-[#0D0D0D]/80 p-3">
               <p className="text-sm text-[#8C8C8C]">Date of Birth</p>

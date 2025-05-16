@@ -35,7 +35,7 @@ export default function OutputDashboard() {
       }
     }
     
-    fetchAthletes();
+    void fetchAthletes();
   }, []);
 
   // Handle athlete selection from URL query parameter
@@ -55,7 +55,7 @@ export default function OutputDashboard() {
   const handleAthleteChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     const athleteId = event.target.value;
     if (athleteId) {
-      const athlete = athletes.find(a => a.id === athleteId) || null;
+      const athlete = athletes.find(a => a.id === athleteId) ?? null;
       console.log('Selected athlete:', athlete);
       setSelectedAthlete(athlete);
     } else {
@@ -87,7 +87,7 @@ export default function OutputDashboard() {
             <div className="w-full max-w-xs sm:w-64">
               <select
                 className="w-full rounded-md border-[#8C8C8C]/20 bg-[#1a1a1a] px-3 py-2 text-white focus:border-[#887D2B] focus:ring focus:ring-[#887D2B]/30"
-                value={selectedAthlete?.id || ''}
+                value={selectedAthlete?.id ?? ''}
                 onChange={handleAthleteChange}
                 disabled={isLoadingAthletes}
               >

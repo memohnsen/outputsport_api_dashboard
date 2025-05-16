@@ -30,7 +30,7 @@ export default function AthletesList() {
       }
     }
 
-    fetchAthletes();
+    void fetchAthletes();
   }, []);
 
   // Sort athletes whenever the athletes array or sort option changes
@@ -165,7 +165,7 @@ export default function AthletesList() {
             <div className="mb-4 grid grid-cols-2 gap-2">
               <div className="rounded bg-[#0D0D0D]/90 p-2">
                 <p className="text-xs text-[#8C8C8C]">External ID</p>
-                <p className="truncate text-sm text-white">{athlete.externalId || 'N/A'}</p>
+                <p className="truncate text-sm text-white">{athlete.externalId ?? 'N/A'}</p>
               </div>
               <div className="rounded bg-[#0D0D0D]/90 p-2">
                 <p className="text-xs text-[#8C8C8C]">Date of Birth</p>

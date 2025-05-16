@@ -2,6 +2,7 @@ import { HydrateClient } from "@/trpc/server";
 import Dashboard from "./_components/Dashboard";
 import OutputDashboard from "./_components/OutputDashboard";
 import { Suspense } from "react";
+import Link from "next/link";
 
 export default async function Home() {
   return (
@@ -13,8 +14,8 @@ export default async function Home() {
               <span className="text-[#887D2B]">Power & Grace</span> Performance Analytics
             </h1>
             <nav className="hidden space-x-8 md:flex">
-              <a href="/" className="text-white hover:text-[#887D2B]">Dashboard</a>
-              <a href="/athletes" className="text-[#8C8C8C] hover:text-white">Athletes</a>
+              <Link href="/" className="text-white hover:text-[#887D2B]">Dashboard</Link>
+              <Link href="/athletes" className="text-[#8C8C8C] hover:text-white">Athletes</Link>
             </nav>
             <button className="rounded-md bg-white/10 p-2 md:hidden">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">

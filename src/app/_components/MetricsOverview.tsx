@@ -47,7 +47,7 @@ export default function MetricsOverview() {
       }
     }
 
-    fetchMetrics();
+    void fetchMetrics();
   }, []);
 
   if (loading) {
