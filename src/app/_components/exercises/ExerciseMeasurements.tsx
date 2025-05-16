@@ -2,10 +2,14 @@
 
 import { useEffect, useState } from 'react';
 import { getExerciseMeasurements, getExerciseMetadata, getLast30DaysRange } from '@/services/outputSports.client';
-import type { ExerciseMetadata, ExerciseMeasurement } from '@/services/outputSports.client';
+import type { ExerciseMetadata, ExerciseMeasurement, Athlete } from '@/services/outputSports.client';
 import { LineChart as RechartsLineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
-export default function ExerciseMeasurements() {
+interface ExerciseMeasurementsProps {
+  selectedAthlete: Athlete | null;
+}
+
+export default function ExerciseMeasurements({ selectedAthlete }: ExerciseMeasurementsProps) {
   const [measurements, setMeasurements] = useState<ExerciseMeasurement[]>([]);
   const [exercises, setExercises] = useState<ExerciseMetadata[]>([]);
   const [loading, setLoading] = useState(true);
@@ -26,7 +30,9 @@ export default function ExerciseMeasurements() {
         const { startDate, endDate } = getLast30DaysRange();
         
         // Fetch measurements for all exercises for the last 30 days
-        const measurementsData = await getExerciseMeasurements(startDate, endDate);
+        // If an athlete is selected, only fetch their measurements
+        const athleteIds = selectedAthlete ? [selectedAthlete.id] : [];
+        const measurementsData = await getExerciseMeasurements(startDate, endDate, [], athleteIds);
         setMeasurements(measurementsData);
         
         // If there are exercises, set the first one as selected
@@ -44,7 +50,7 @@ export default function ExerciseMeasurements() {
     }
 
     fetchData();
-  }, []);
+  }, [selectedAthlete]); // Re-fetch when selectedAthlete changes
 
   // Update chart data when selected exercise changes or measurements are loaded
   useEffect(() => {
@@ -132,7 +138,9 @@ export default function ExerciseMeasurements() {
 
   return (
     <div className="w-full rounded-xl bg-white/5 p-6 backdrop-blur-sm">
-      <h3 className="mb-4 text-xl font-semibold text-white">Exercise Measurements</h3>
+      <h3 className="mb-4 text-xl font-semibold text-white">
+        {selectedAthlete ? `${selectedAthlete.fullName}'s ` : ''}Exercise Measurements
+      </h3>
       
       <div className="mb-6">
         <label htmlFor="exercise-select" className="mb-2 block text-sm font-medium text-gray-400">
@@ -157,6 +165,7 @@ export default function ExerciseMeasurements() {
           <div className="mb-4">
             <h4 className="text-lg font-medium text-white">
               {exercises.find(e => e.id === selectedExercise)?.name} Performance Trends
+              {selectedAthlete ? ` for ${selectedAthlete.fullName}` : ''}
             </h4>
             <p className="text-sm text-gray-400">Last 30 days data visualization</p>
           </div>
@@ -240,7 +249,11 @@ export default function ExerciseMeasurements() {
         </div>
       ) : (
         <div className="rounded-md bg-blue-500/20 p-4 text-center text-white">
-          <p>No measurement data available for the selected exercise in the last 30 days.</p>
+          <p>
+            {selectedAthlete 
+              ? `No measurement data available for ${selectedAthlete.fullName} on the selected exercise in the last 30 days.` 
+              : 'No measurement data available for the selected exercise in the last 30 days.'}
+          </p>
         </div>
       )}
     </div>
