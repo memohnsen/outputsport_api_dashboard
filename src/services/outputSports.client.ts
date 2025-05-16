@@ -77,14 +77,30 @@ export async function getExerciseMeasurements(
   athleteIds: string[] = []
 ): Promise<ExerciseMeasurement[]> {
   try {
-    // Convert dates to strings if they're Date objects
+    // Convert dates to strings if they're Date objects, using LOCAL date components
+    const formatLocalDate = (date: Date): string => {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+    
     const startDateStr = typeof startDate === 'string' 
       ? startDate 
-      : startDate.toISOString().split('T')[0];
+      : formatLocalDate(startDate);
     
     const endDateStr = typeof endDate === 'string' 
       ? endDate 
-      : endDate.toISOString().split('T')[0];
+      : formatLocalDate(endDate);
+    
+    // Check if this is a "today" request
+    const now = new Date();
+    const todayStr = formatLocalDate(now);
+    const isTodayRequest = startDateStr === endDateStr && startDateStr === todayStr;
+    
+    if (isTodayRequest) {
+      console.log(`THIS IS A TODAY REQUEST - Today's date: ${todayStr}`);
+    }
     
     console.log(`Client: Sending request with string date range ${startDateStr} to ${endDateStr}`);
     
@@ -110,6 +126,19 @@ export async function getExerciseMeasurements(
     
     const data = await response.json();
     console.log(`Client: Received ${data.length} measurements`);
+    
+    // If this is a "today" request, check if we have any data for today
+    if (isTodayRequest) {
+      const todayData = data.filter((m: ExerciseMeasurement) => m.completedDate.split('T')[0] === todayStr);
+      console.log(`TODAY REQUEST - Found ${todayData.length} measurements for today out of ${data.length} total`);
+      
+      if (todayData.length > 0) {
+        console.log(`First today measurement: ${JSON.stringify(todayData[0])}`);
+      } else {
+        console.log('No measurements found for today!');
+      }
+    }
+    
     return data;
   } catch (error) {
     console.error('Client error fetching measurements:', error);

@@ -25,9 +25,15 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange }: Exe
 
   // Get date range based on selected time range
   const getDateRange = () => {
+    // Get current date in local timezone
     const now = new Date();
+    
+    // Format date as YYYY-MM-DD using local date components
     const formatDateString = (date: Date) => {
-      return date.toISOString().split('T')[0]; // YYYY-MM-DD format
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
     };
     
     // Current date as end date
@@ -37,8 +43,10 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange }: Exe
     // Calculate date ranges based on selected option
     switch(timeRange) {
       case 'today':
-        // Today's date
+        // Today's date - explicitly set both start and end date to today
         startDateStr = endDateStr;
+        console.log(`Today's exact date: ${now.toLocaleString()}`);
+        console.log(`Today's range string: ${startDateStr} (for both start and end)`);
         break;
       case '7days':
         // 7 days ago
@@ -102,8 +110,16 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange }: Exe
         const startDate = new Date();
         startDate.setFullYear(endDate.getFullYear() - 1);
         
-        const startDateStr = startDate.toISOString().split('T')[0];
-        const endDateStr = endDate.toISOString().split('T')[0];
+        // Format dates using local components
+        const formatLocalDate = (date: Date) => {
+          const year = date.getFullYear();
+          const month = String(date.getMonth() + 1).padStart(2, '0');
+          const day = String(date.getDate()).padStart(2, '0');
+          return `${year}-${month}-${day}`;
+        };
+        
+        const startDateStr = formatLocalDate(startDate);
+        const endDateStr = formatLocalDate(endDate);
         
         console.log(`Fetching all measurements from ${startDateStr} to ${endDateStr}`);
         
@@ -138,7 +154,7 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange }: Exe
             const fallbackStartDate = new Date();
             fallbackStartDate.setDate(fallbackStartDate.getDate() - 90);
             
-            const fallbackStartStr = fallbackStartDate.toISOString().split('T')[0];
+            const fallbackStartStr = formatLocalDate(fallbackStartDate);
             const fallbackAllMeasurements = await getExerciseMeasurements(
               fallbackStartStr || '', 
               endDateStr || '', 
@@ -186,10 +202,66 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange }: Exe
     console.log(`Filtering measurements for time range: ${currentTimeRange} (${startDateStr} to ${endDateStr})`);
     
     try {
-      // Convert string dates to Date objects for comparison
-      const startDate = startDateStr ? new Date(startDateStr) : new Date();
-      const endDate = endDateStr ? new Date(endDateStr) : new Date();
-      endDate.setHours(23, 59, 59, 999); // Include the entire end date
+      // For the "today" case, use a simpler string-based date comparison to avoid timezone issues
+      if (currentTimeRange === 'today') {
+        console.log(`TODAY CASE - Using direct date string comparison with ${startDateStr}`);
+        
+        // Filter directly using the date string for today's date
+        const filteredByDate = measurements.filter(measurement => {
+          // Extract just the date part from the measurement's completedDate
+          const datePartOnly = measurement.completedDate.split('T')[0];
+          const isToday = datePartOnly === startDateStr; // Since startDateStr === endDateStr for "today"
+          
+          console.log(`Measurement date: ${measurement.completedDate}, extracted date: ${datePartOnly}, isToday: ${isToday}`);
+          return isToday;
+        });
+        
+        console.log(`Filtered to ${filteredByDate.length} measurements for TODAY`);
+        
+        // Continue with the rest of the filtering logic...
+        setMeasurements(filteredByDate);
+        
+        // Get unique exercise IDs from the filtered measurements
+        const exerciseIdsWithData = new Set(filteredByDate.map(m => m.exerciseId));
+        
+        // Filter the exercises metadata to only include exercises with data
+        const availableExercises = exercises.filter(exercise => 
+          exerciseIdsWithData.has(exercise.id)
+        );
+        
+        console.log(`Found ${availableExercises.length} exercises with data for today`);
+        setFilteredExercises(availableExercises);
+        
+        // Update selected exercise if needed
+        if (selectedExercise && !exerciseIdsWithData.has(selectedExercise)) {
+          if (availableExercises.length > 0 && availableExercises[0]?.id) {
+            console.log(`Selected exercise ${selectedExercise} has no data in this range, switching to ${availableExercises[0].id}`);
+            setSelectedExercise(availableExercises[0].id);
+          } else {
+            setSelectedExercise(null);
+          }
+        } else if (!selectedExercise && availableExercises.length > 0 && availableExercises[0]?.id) {
+          setSelectedExercise(availableExercises[0].id);
+        }
+        
+        setError(null);
+        setLoading(false);
+        return;
+      }
+      
+      // For other time ranges, use the existing date-based comparison logic
+      // Create fresh Date objects from our formatted date strings (in local time)
+      const startDate = new Date(startDateStr);
+      const endDate = new Date(endDateStr);
+      
+      // Set time to beginning of day (00:00:00) in local time
+      startDate.setHours(0, 0, 0, 0);
+      
+      // Set time to end of day (23:59:59.999) in local time
+      endDate.setHours(23, 59, 59, 999);
+      
+      // Log the actual date objects with times for debugging
+      console.log(`Date range for filtering - Start: ${startDate.toISOString()}, End: ${endDate.toISOString()}`);
       
       // Filter measurements by date range
       const filteredByDate = measurements.filter(measurement => {
@@ -237,6 +309,29 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange }: Exe
   // Filter measurements when time range changes
   useEffect(() => {
     if (allMeasurements.length > 0) {
+      console.log(`Time range changed to: ${timeRange}, filtering ${allMeasurements.length} measurements...`);
+      
+      // Special debug for "today" - log any measurements that exist for today
+      if (timeRange === 'today') {
+        // Get today's date in YYYY-MM-DD format
+        const now = new Date();
+        const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+        
+        console.log(`DEBUG - Today's date: ${todayStr}`);
+        
+        // Check for any measurements with today's date
+        const todayData = allMeasurements.filter(m => {
+          const measurementDateStr = m.completedDate.split('T')[0];
+          const isToday = measurementDateStr === todayStr;
+          if (isToday) {
+            console.log(`Found measurement for today: ${m.completedDate}, athlete: ${m.athleteFirstName} ${m.athleteLastName}`);
+          }
+          return isToday;
+        });
+        
+        console.log(`Total today's measurements in data: ${todayData.length}`);
+      }
+      
       filterMeasurementsByTimeRange(allMeasurements, timeRange);
     }
   }, [timeRange, allMeasurements, exercises]);

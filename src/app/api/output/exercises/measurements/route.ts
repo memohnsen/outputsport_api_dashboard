@@ -27,9 +27,23 @@ export async function POST(request: Request) {
     
     // Convert to Date objects for the server API
     try {
-      // Create dates at noon to avoid timezone issues
-      const parsedStartDate = new Date(`${startDate}T12:00:00.000Z`);
-      const parsedEndDate = new Date(`${endDate}T12:00:00.000Z`);
+      // For "today" case, use the exact same date string but ensure full day coverage
+      const isSameDay = startDate === endDate;
+      
+      // Create dates with explicit time components for proper coverage
+      // For the start of the day, use 00:00:00 local time
+      const parsedStartDate = new Date(startDate + "T00:00:00");
+      
+      // For the end of the day, use 23:59:59 local time
+      let parsedEndDate = new Date(endDate + "T23:59:59.999");
+      
+      console.log(`Raw date strings received: startDate=${startDate}, endDate=${endDate}`);
+      console.log(`Parsed dates: start=${parsedStartDate.toISOString()}, end=${parsedEndDate.toISOString()}`);
+      
+      if (isSameDay) {
+        console.log("TODAY CASE DETECTED - Ensuring full day coverage");
+        console.log(`Today's date range: ${parsedStartDate.toISOString()} to ${parsedEndDate.toISOString()}`);
+      }
       
       // Validate dates
       if (isNaN(parsedStartDate.getTime()) || isNaN(parsedEndDate.getTime())) {
@@ -61,6 +75,7 @@ export async function POST(request: Request) {
         adjustedStartDate = new Date(parsedEndDate);
         // Set the start date to be MAX_RANGE_DAYS before the end date
         adjustedStartDate.setDate(adjustedStartDate.getDate() - MAX_RANGE_DAYS);
+        adjustedStartDate.setHours(0, 0, 0, 0); // Set to beginning of day
         console.log(`Adjusted start date from ${parsedStartDate.toISOString()} to ${adjustedStartDate.toISOString()}`);
       }
       
@@ -86,6 +101,7 @@ export async function POST(request: Request) {
             console.log("Trying fallback with shorter date range (30 days)");
             const fallbackStartDate = new Date(parsedEndDate);
             fallbackStartDate.setDate(fallbackStartDate.getDate() - 30);
+            fallbackStartDate.setHours(0, 0, 0, 0); // Start at beginning of day
             
             try {
               const fallbackMeasurements = await getExerciseMeasurements(
