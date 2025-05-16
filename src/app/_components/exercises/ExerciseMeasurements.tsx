@@ -364,51 +364,266 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange }: Exe
       });
     }
     
-    // Process data for the chart
-    const processedData = exerciseMeasurements.map(measurement => {
-      // Ensure we have proper date handling
-      let formattedDate = '';
-      let formattedFullDate = new Date();
-      
-      try {
-        const date = new Date(measurement.completedDate);
-        if (!isNaN(date.getTime())) {
-          formattedDate = `${date.getMonth() + 1}/${date.getDate()}`;
-          formattedFullDate = date;
-        } else {
-          console.error('Invalid date in measurement:', measurement.completedDate);
+    // Process data for the chart, with time-based aggregation based on time range
+    let processedData;
+    
+    // Log the type of data we're working with
+    console.log(`Processing ${exerciseMeasurements.length} measurements for ${timeRange} view`);
+    console.log(`First measurement sample:`, exerciseMeasurements[0]);
+
+    if (timeRange === 'today') {
+      // For today view, display individual sets/measurements
+      processedData = exerciseMeasurements.map(measurement => {
+        // Ensure we have proper date handling
+        let formattedDate = '';
+        let formattedFullDate = new Date();
+        
+        try {
+          const date = new Date(measurement.completedDate);
+          if (!isNaN(date.getTime())) {
+            // For today view, include the time for each set
+            const hours = date.getHours();
+            const minutes = date.getMinutes();
+            formattedDate = `${hours}:${minutes < 10 ? '0' + minutes : minutes}`;
+            formattedFullDate = date;
+          } else {
+            console.error('Invalid date in measurement:', measurement.completedDate);
+          }
+        } catch (error) {
+          console.error('Error processing date:', error);
         }
-      } catch (error) {
-        console.error('Error processing date:', error);
-      }
-      
-      // Create a base object with the date and athlete info
-      const dataPoint: any = {
-        id: measurement.id,
-        date: formattedDate,
-        fullDate: formattedFullDate,
-        rawDate: measurement.completedDate,
-        athleteId: measurement.athleteId,
-        athleteName: `${measurement.athleteFirstName} ${measurement.athleteLastName}`,
-        exerciseId: measurement.exerciseId,
-        exerciseCategory: measurement.exerciseCategory,
-        exerciseType: measurement.exerciseType,
-        variant: measurement.variant || 'Standard'
-      };
-      
-      // Add all metrics to the data point with proper field names and round to 2 decimal places
-      measurement.metrics.forEach(metric => {
-        dataPoint[metric.field] = Number(metric.value.toFixed(2));
+        
+        // Create a base object with the date and athlete info
+        const dataPoint: any = {
+          id: measurement.id,
+          date: formattedDate,
+          fullDate: formattedFullDate,
+          rawDate: measurement.completedDate,
+          athleteId: measurement.athleteId,
+          athleteName: `${measurement.athleteFirstName} ${measurement.athleteLastName}`,
+          exerciseId: measurement.exerciseId,
+          exerciseCategory: measurement.exerciseCategory,
+          exerciseType: measurement.exerciseType,
+          variant: measurement.variant || 'Standard'
+        };
+        
+        // Add all metrics to the data point with proper field names and round to 2 decimal places
+        measurement.metrics.forEach(metric => {
+          dataPoint[metric.field] = Number(metric.value.toFixed(2));
+        });
+        
+        return dataPoint;
       });
       
-      return dataPoint;
-    });
+      // Sort by time for today view
+      processedData.sort((a, b) => a.fullDate.getTime() - b.fullDate.getTime());
+    } else {
+      // For other time ranges, aggregate data based on the selected range
+      const aggregatedData: Record<string, any> = {};
+      
+      // Get the metric fields from the first measurement to ensure we capture all fields
+      const allMetricFields = new Set<string>();
+      exerciseMeasurements.forEach(measurement => {
+        measurement.metrics.forEach(metric => {
+          allMetricFields.add(metric.field);
+        });
+      });
+      console.log(`Found ${allMetricFields.size} unique metric fields:`, [...allMetricFields]);
+      
+      // Define the grouping key based on time range
+      exerciseMeasurements.forEach(measurement => {
+        try {
+          const date = new Date(measurement.completedDate);
+          if (isNaN(date.getTime())) {
+            console.error('Invalid date in measurement:', measurement.completedDate);
+            return;
+          }
+          
+          let groupKey = '';
+          let displayDate = '';
+          
+          // Different grouping logic based on time range
+          if (timeRange === '7days') {
+            // Group by day for week view
+            groupKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+            displayDate = `${date.getMonth() + 1}/${date.getDate()}`;
+          } else if (timeRange === '30days') {
+            // Group by week for month view
+            // Get the start of the year
+            const startOfYear = new Date(date.getFullYear(), 0, 1);
+            // Calculate days since start of year
+            const daysSinceStart = Math.floor((date.getTime() - startOfYear.getTime()) / (24 * 60 * 60 * 1000));
+            // Get week number (0-indexed)
+            const weekNumber = Math.floor(daysSinceStart / 7);
+            
+            groupKey = `${date.getFullYear()}-W${weekNumber}`;
+            
+            // Calculate the start and end date of this week for better display
+            const weekStart = new Date(startOfYear);
+            weekStart.setDate(weekStart.getDate() + (weekNumber * 7));
+            const weekEnd = new Date(weekStart);
+            weekEnd.setDate(weekEnd.getDate() + 6);
+            
+            // Format as "MM/DD-MM/DD" for week range
+            displayDate = `${weekStart.getMonth() + 1}/${weekStart.getDate()}-${weekEnd.getMonth() + 1}/${weekEnd.getDate()}`;
+          } else {
+            // Group by month for 90 days and all time
+            groupKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+            
+            // Month names for better display
+            const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            displayDate = `${monthNames[date.getMonth()]} ${date.getFullYear()}`;
+          }
+          
+          // Initialize group if it doesn't exist
+          if (!aggregatedData[groupKey]) {
+            // Initialize with all possible metric fields set to zero
+            const metricSums: Record<string, number> = {};
+            const metricCounts: Record<string, number> = {};
+            
+            allMetricFields.forEach(field => {
+              metricSums[field] = 0;
+              metricCounts[field] = 0;
+            });
+            
+            aggregatedData[groupKey] = {
+              id: groupKey, // Ensure we have an ID for the chart
+              groupKey,
+              date: displayDate,
+              fullDate: date,
+              rawDate: measurement.completedDate,
+              measurementCount: 0,
+              exerciseId: measurement.exerciseId,
+              exerciseCategory: measurement.exerciseCategory,
+              exerciseType: measurement.exerciseType,
+              athleteId: measurement.athleteId,
+              athleteName: `${measurement.athleteFirstName} ${measurement.athleteLastName}`,
+              variant: measurement.variant || 'Standard',
+              metricSums,
+              metricCounts
+            };
+          }
+          
+          // Increment the count of measurements in this group
+          aggregatedData[groupKey].measurementCount++;
+          
+          // Accumulate metric values for averaging
+          measurement.metrics.forEach(metric => {
+            if (!aggregatedData[groupKey].metricSums[metric.field]) {
+              aggregatedData[groupKey].metricSums[metric.field] = 0;
+              aggregatedData[groupKey].metricCounts[metric.field] = 0;
+            }
+            
+            aggregatedData[groupKey].metricSums[metric.field] += metric.value;
+            aggregatedData[groupKey].metricCounts[metric.field]++;
+          });
+        } catch (error) {
+          console.error('Error aggregating data:', error);
+        }
+      });
+      
+      // Calculate averages and prepare the final data
+      processedData = Object.values(aggregatedData).map(group => {
+        // Create the basic data point structure that the chart expects
+        const dataPoint: any = {
+          id: group.groupKey,
+          groupKey: group.groupKey,
+          date: group.date,
+          fullDate: group.fullDate,
+          rawDate: group.rawDate,
+          measurementCount: group.measurementCount,
+          athleteId: group.athleteId,
+          athleteName: group.athleteName,
+          exerciseId: group.exerciseId,
+          exerciseCategory: group.exerciseCategory,
+          exerciseType: group.exerciseType,
+          variant: group.variant
+        };
+        
+        // Add all metric fields directly to the data point - this is crucial for the chart
+        allMetricFields.forEach(field => {
+          if (group.metricCounts[field] > 0) {
+            const avg = group.metricSums[field] / group.metricCounts[field];
+            dataPoint[field] = Number(avg.toFixed(2));
+          } else {
+            // Ensure the field exists even if no data (use null instead of undefined)
+            dataPoint[field] = null;
+          }
+        });
+        
+        // Debug log to verify data structure
+        console.log(`Aggregated data point for ${group.date}:`, 
+          Object.entries(dataPoint)
+            .filter(([key]) => allMetricFields.has(key))
+            .map(([key, value]) => `${key}: ${value}`)
+        );
+        
+        return dataPoint;
+      });
+      
+      // Sort by date for aggregated views
+      if (timeRange === '7days') {
+        // Sort by day for week view - need to parse the actual dates
+        processedData.sort((a, b) => {
+          return a.fullDate.getTime() - b.fullDate.getTime();
+        });
+      } else if (timeRange === '30days') {
+        // Sort by week for month view
+        processedData.sort((a, b) => {
+          // Extract week numbers from the groupKey
+          const getWeekNumber = (key: string | undefined): number => {
+            if (!key) return 0;
+            const match = key.match(/W(\d+)/);
+            return match ? parseInt(match[1]) : 0;
+          };
+          
+          const weekA = getWeekNumber(a.groupKey as string);
+          const weekB = getWeekNumber(b.groupKey as string);
+          
+          // First sort by year, then by week
+          const yearA = parseInt((a.groupKey || '').split('-')[0] || '0');
+          const yearB = parseInt((b.groupKey || '').split('-')[0] || '0');
+          
+          if (yearA !== yearB) {
+            return yearA - yearB;
+          }
+          
+          return weekA - weekB;
+        });
+      } else {
+        // Sort by month for 90 days and all time
+        processedData.sort((a, b) => {
+          // Extract year and month from groupKey (YYYY-MM)
+          const [yearA, monthA] = a.groupKey.split('-').map((num: string) => parseInt(num));
+          const [yearB, monthB] = b.groupKey.split('-').map((num: string) => parseInt(num));
+          
+          // First compare years
+          if (yearA !== yearB) {
+            return yearA - yearB;
+          }
+          
+          // Then compare months
+          return monthA - monthB;
+        });
+      }
+      
+      // Add dates to debug logs
+      if (processedData.length > 0) {
+        console.log(`First processed data point after sorting:`, processedData[0]);
+        console.log(`Sorted dates:`, processedData.map(d => d.date).join(', '));
+        
+        // Check if the data point has the expected metrics
+        const metrics = Object.keys(processedData[0]).filter(key => 
+          !['id', 'groupKey', 'date', 'fullDate', 'rawDate', 'measurementCount', 
+            'athleteId', 'athleteName', 'exerciseId', 'exerciseCategory', 
+            'exerciseType', 'variant', 'metricSums', 'metricCounts'].includes(key)
+        );
+        console.log(`Available metrics in processed data: ${metrics.join(', ')}`);
+      }
+    }
     
     // Log the processed data for debugging
     console.log(`Processed chart data: ${processedData.length} data points for ${timeRange}`);
-    
-    // Sort by date
-    processedData.sort((a, b) => a.fullDate.getTime() - b.fullDate.getTime());
     
     setChartData(processedData);
     
@@ -421,6 +636,16 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange }: Exe
     });
     setVisibleMetrics(initialVisibility);
     
+    // Debug log to check what metrics are available in the chart data
+    if (processedData && processedData.length > 0) {
+      console.log('Chart data metrics check:');
+      const sampleDataPoint = processedData[0];
+      const metricFields = getUniqueMetricFields(processedData);
+      console.log(`Available metric fields: ${metricFields.join(', ')}`);
+      metricFields.forEach(field => {
+        console.log(`Sample value for ${field}: ${sampleDataPoint[field]}`);
+      });
+    }
   }, [selectedExercise, measurements, timeRange]);
 
   // Update the time range text in the subtitle
@@ -437,14 +662,15 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange }: Exe
   };
 
   const getUniqueMetricFields = (data = chartData) => {
-    if (data.length === 0) return [];
+    if (!data || data.length === 0) return [];
     
     // Get all metric fields excluding non-metric properties
-    const excludedFields = ['id', 'date', 'fullDate', 'rawDate', 'athleteId', 'athleteName', 
-                           'exerciseId', 'exerciseCategory', 'exerciseType', 'variant'];
+    const excludedFields = ['id', 'groupKey', 'date', 'fullDate', 'rawDate', 'athleteId', 'athleteName', 
+                           'exerciseId', 'exerciseCategory', 'exerciseType', 'variant', 
+                           'measurementCount', 'metricSums', 'metricCounts'];
     
     const fields = Object.keys(data[0]).filter(
-      key => !excludedFields.includes(key)
+      key => !excludedFields.includes(key) && data[0][key] !== undefined && data[0][key] !== null
     );
     
     return fields;
@@ -797,7 +1023,27 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange }: Exe
                   }}
                 >
                   <CartesianGrid strokeDasharray="3 3" stroke="#333" />
-                  <XAxis dataKey="date" stroke="#8C8C8C" />
+                  <XAxis 
+                    dataKey="date" 
+                    stroke="#8C8C8C"
+                    tickFormatter={(value) => {
+                      // If we're in an aggregated view, show appropriate labels
+                      if (timeRange !== 'today') {
+                        return value;
+                      } else {
+                        // For today view, show times more cleanly
+                        return value; // Already formatted as HH:MM in the data processing
+                      }
+                    }}
+                    label={{ 
+                      value: timeRange === 'today' ? 'Time' : 
+                            timeRange === '7days' ? 'Day' : 
+                            timeRange === '30days' ? 'Week' : 'Month', 
+                      position: 'insideBottomRight', 
+                      offset: -10,
+                      fill: '#8C8C8C'
+                    }}
+                  />
                   <YAxis stroke="#8C8C8C" />
                   <Tooltip 
                     contentStyle={{ 
@@ -861,7 +1107,36 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange }: Exe
                       
                       return [formattedValue, String(name)];
                     }}
-                    labelFormatter={(label) => `Date: ${label}`}
+                    labelFormatter={(label, payload) => {
+                      // Add measurement count info for aggregated views
+                      if (timeRange !== 'today' && payload && payload.length > 0 && payload[0]?.payload) {
+                        const measurement = payload[0].payload;
+                        if (measurement && typeof measurement.measurementCount === 'number') {
+                          const count = measurement.measurementCount;
+                          let timeUnit = '';
+                          
+                          switch(timeRange) {
+                            case '7days':
+                              timeUnit = 'Day';
+                              break;
+                            case '30days':
+                              timeUnit = 'Week';
+                              break;
+                            default:
+                              timeUnit = 'Month';
+                              break;
+                          }
+                          
+                          return `${timeUnit}: ${label} (${count} measurement${count !== 1 ? 's' : ''})`;
+                        }
+                      }
+                      
+                      if (timeRange === 'today') {
+                        return `Time: ${label}`;
+                      }
+                      
+                      return `Date: ${label}`;
+                    }}
                   />
                   
                   {getUniqueMetricFields().map((field, index) => {
@@ -875,6 +1150,7 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange }: Exe
                         stroke={colors[index % colors.length]} 
                         activeDot={{ r: 8 }} 
                         name={formatMetricName(field)}
+                        connectNulls={true}
                       />
                     ) : null;
                   })}
@@ -965,10 +1241,18 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange }: Exe
                   <tbody>
                     {chartData.map((dataPoint, index) => (
                       <tr 
-                        key={dataPoint.id || index} 
+                        key={dataPoint.id || dataPoint.groupKey || index} 
                         className="border-b border-[#8C8C8C]/10 hover:bg-[#0D0D0D]/70"
                       >
-                        <td className="px-4 py-3 text-white">{dataPoint.date || formatDateDisplay(dataPoint.rawDate)}</td>
+                        <td className="px-4 py-3 text-white">
+                          {dataPoint.date || formatDateDisplay(dataPoint.rawDate)}
+                          {/* Show measurement count for aggregated views */}
+                          {timeRange !== 'today' && dataPoint.measurementCount && (
+                            <span className="text-xs text-[#8C8C8C] ml-1">
+                              ({dataPoint.measurementCount} set{dataPoint.measurementCount !== 1 ? 's' : ''})
+                            </span>
+                          )}
+                        </td>
                         <td className="px-4 py-3 text-[#8C8C8C]">{dataPoint.athleteName}</td>
                         <td className="px-4 py-3 text-[#8C8C8C]">{dataPoint.variant}</td>
                         {getUniqueMetricFields().map(field => 
