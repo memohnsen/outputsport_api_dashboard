@@ -22,6 +22,7 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange }: Exe
   const [error, setError] = useState<string | null>(null);
   const [selectedExercise, setSelectedExercise] = useState<string | null>(null);
   const [chartData, setChartData] = useState<any[]>([]);
+  const [visibleMetrics, setVisibleMetrics] = useState<Record<string, boolean>>({});
 
   // Get date range based on selected time range
   const getDateRange = () => {
@@ -386,9 +387,9 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange }: Exe
         variant: measurement.variant || 'Standard'
       };
       
-      // Add all metrics to the data point with proper field names
+      // Add all metrics to the data point with proper field names and round to 2 decimal places
       measurement.metrics.forEach(metric => {
-        dataPoint[metric.field] = metric.value;
+        dataPoint[metric.field] = Number(metric.value.toFixed(2));
       });
       
       return dataPoint;
@@ -401,6 +402,16 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange }: Exe
     processedData.sort((a, b) => a.fullDate.getTime() - b.fullDate.getTime());
     
     setChartData(processedData);
+    
+    // Initialize visible metrics - set all metrics to visible by default
+    const metricFields = getUniqueMetricFields(processedData);
+    const initialVisibility: Record<string, boolean> = {};
+    metricFields.forEach(field => {
+      // Ensure all metrics are visible (checked) by default
+      initialVisibility[field] = true;
+    });
+    setVisibleMetrics(initialVisibility);
+    
   }, [selectedExercise, measurements, timeRange]);
 
   // Update the time range text in the subtitle
@@ -416,20 +427,48 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange }: Exe
     }
   };
 
-  const getUniqueMetricFields = () => {
-    if (chartData.length === 0) return [];
+  const getUniqueMetricFields = (data = chartData) => {
+    if (data.length === 0) return [];
     
     // Get all metric fields excluding non-metric properties
     const excludedFields = ['id', 'date', 'fullDate', 'rawDate', 'athleteId', 'athleteName', 
                            'exerciseId', 'exerciseCategory', 'exerciseType', 'variant'];
     
-    const fields = Object.keys(chartData[0]).filter(
+    const fields = Object.keys(data[0]).filter(
       key => !excludedFields.includes(key)
     );
     
     return fields;
   };
-
+  
+  // Toggle visibility of a metric in the chart
+  const toggleMetricVisibility = (metricField: string) => {
+    setVisibleMetrics(prev => ({
+      ...prev,
+      [metricField]: !prev[metricField]
+    }));
+  };
+  
+  // Select all metrics
+  const selectAllMetrics = () => {
+    const allMetrics = getUniqueMetricFields();
+    const allVisible: Record<string, boolean> = {};
+    allMetrics.forEach(field => {
+      allVisible[field] = true;
+    });
+    setVisibleMetrics(allVisible);
+  };
+  
+  // Deselect all metrics
+  const deselectAllMetrics = () => {
+    const allMetrics = getUniqueMetricFields();
+    const allHidden: Record<string, boolean> = {};
+    allMetrics.forEach(field => {
+      allHidden[field] = false;
+    });
+    setVisibleMetrics(allHidden);
+  };
+  
   // Format the date to be more readable
   const formatDateDisplay = (dateString: string) => {
     try {
@@ -535,15 +574,6 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange }: Exe
         {selectedAthlete ? `${selectedAthlete.fullName}'s ` : ''}Exercise Measurements
       </h3>
       
-      {!selectedAthlete && (
-        <div className="mb-4 rounded-md bg-[#887D2B]/10 p-4 text-center">
-          <p className="text-[#8C8C8C]">
-            Select an athlete from the dropdown above to view their specific measurements.
-            Currently showing data for all athletes.
-          </p>
-        </div>
-      )}
-      
       <div className="mb-6">
         <label htmlFor="exercise-select" className="mb-2 block text-sm font-medium text-[#8C8C8C]">
           Select Exercise:
@@ -589,54 +619,98 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange }: Exe
         </div>
       ) : chartData.length > 0 ? (
         <div>
-          <div className="mb-4">
-            <h4 className="text-lg font-medium text-white">
-              {exercises.find(e => e.id === selectedExercise)?.name} Performance Trends
-              {selectedAthlete ? ` for ${selectedAthlete.fullName}` : ''}
-            </h4>
-            <p className="text-sm text-[#8C8C8C]">{getTimeRangeText()} data visualization</p>
-          </div>
-          
-          <div className="h-96 w-full bg-[#1a1a1a]/80 rounded-lg p-2">
-            <ResponsiveContainer width="100%" height="100%">
-              <RechartsLineChart
-                data={chartData}
-                margin={{
-                  top: 5,
-                  right: 30,
-                  left: 20,
-                  bottom: 5,
-                }}
-              >
-                <CartesianGrid strokeDasharray="3 3" stroke="#333" />
-                <XAxis dataKey="date" stroke="#8C8C8C" />
-                <YAxis stroke="#8C8C8C" />
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: 'rgba(40, 40, 40, 0.95)',
-                    borderColor: '#8C8C8C',
-                    color: 'white'
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="h-96 w-full md:w-3/4 bg-[#1a1a1a]/80 rounded-lg p-2">
+              <ResponsiveContainer width="100%" height="100%">
+                <RechartsLineChart
+                  data={chartData}
+                  margin={{
+                    top: 10,
+                    right: 20,
+                    left: 20,
+                    bottom: 10,
                   }}
-                  formatter={(value, name) => [value, name]}
-                  labelFormatter={(label) => `Date: ${label}`}
-                />
-                <Legend wrapperStyle={{ color: '#8C8C8C' }} />
-                
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="#333" />
+                  <XAxis dataKey="date" stroke="#8C8C8C" />
+                  <YAxis stroke="#8C8C8C" />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: 'rgba(40, 40, 40, 0.95)',
+                      borderColor: '#8C8C8C',
+                      color: 'white'
+                    }}
+                    formatter={(value, name) => {
+                      // Ensure numeric values are rounded to 2 decimal places
+                      const formattedValue = typeof value === 'number' ? value.toFixed(2) : value;
+                      return [formattedValue, name];
+                    }}
+                    labelFormatter={(label) => `Date: ${label}`}
+                  />
+                  
+                  {getUniqueMetricFields().map((field, index) => {
+                    const colors = ['#887D2B', '#A19543', '#7A705F', '#BFAF30', '#D6C12B'];
+                    // Only render the Line if the metric is visible
+                    return visibleMetrics[field] !== false ? (
+                      <Line 
+                        key={field}
+                        type="monotone" 
+                        dataKey={field} 
+                        stroke={colors[index % colors.length]} 
+                        activeDot={{ r: 8 }} 
+                        name={formatMetricName(field)}
+                      />
+                    ) : null;
+                  })}
+                </RechartsLineChart>
+              </ResponsiveContainer>
+            </div>
+            
+            <div className="md:w-1/4 bg-[#1a1a1a]/80 rounded-lg p-4 flex-shrink-0">
+              <div className="flex items-center justify-between mb-3">
+                <div className="text-white font-medium">Metrics</div>
+                <div className="flex space-x-2">
+                  <button 
+                    onClick={selectAllMetrics}
+                    className="px-2 py-1 text-xs bg-[#887D2B]/80 hover:bg-[#887D2B] text-white rounded"
+                  >
+                    Select All
+                  </button>
+                  <button 
+                    onClick={deselectAllMetrics}
+                    className="px-2 py-1 text-xs bg-[#333]/80 hover:bg-[#444] text-white rounded"
+                  >
+                    Deselect All
+                  </button>
+                </div>
+              </div>
+              <div className="flex flex-col space-y-2 max-h-80 overflow-y-auto">
                 {getUniqueMetricFields().map((field, index) => {
                   const colors = ['#887D2B', '#A19543', '#7A705F', '#BFAF30', '#D6C12B'];
                   return (
-                    <Line 
-                      key={field}
-                      type="monotone" 
-                      dataKey={field} 
-                      stroke={colors[index % colors.length]} 
-                      activeDot={{ r: 8 }} 
-                      name={formatMetricName(field)}
-                    />
+                    <div key={field} className="flex items-center">
+                      <input
+                        type="checkbox"
+                        id={`metric-${field}`}
+                        checked={visibleMetrics[field] !== false}
+                        onChange={() => toggleMetricVisibility(field)}
+                        className="mr-2 h-4 w-4 rounded border-[#8C8C8C]/30 bg-[#1a1a1a] focus:ring-[#887D2B]"
+                      />
+                      <label
+                        htmlFor={`metric-${field}`}
+                        className="flex items-center text-sm cursor-pointer"
+                      >
+                        <span 
+                          className="inline-block w-3 h-3 mr-2" 
+                          style={{ backgroundColor: colors[index % colors.length] }}
+                        ></span>
+                        <span className="text-[#8C8C8C]">{formatMetricName(field)}</span>
+                      </label>
+                    </div>
                   );
                 })}
-              </RechartsLineChart>
-            </ResponsiveContainer>
+              </div>
+            </div>
           </div>
           
           <div className="mt-8">
