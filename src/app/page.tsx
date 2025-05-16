@@ -15,8 +15,6 @@ export default async function Home() {
             <nav className="hidden space-x-8 md:flex">
               <a href="#" className="text-white hover:text-[hsl(280,100%,70%)]">Dashboard</a>
               <a href="#" className="text-gray-400 hover:text-white">Athletes</a>
-              <a href="#" className="text-gray-400 hover:text-white">Exercises</a>
-              <a href="#" className="text-gray-400 hover:text-white">Settings</a>
             </nav>
             <button className="rounded-md bg-white/10 p-2 md:hidden">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">

@@ -21,6 +21,7 @@ export default function ExerciseMeasurements({ selectedAthlete }: ExerciseMeasur
     async function fetchData() {
       try {
         setLoading(true);
+        console.log("Fetching data with selected athlete:", selectedAthlete?.fullName);
         
         // First, fetch metadata to get exercise IDs
         const exercisesData = await getExerciseMetadata();
@@ -29,11 +30,27 @@ export default function ExerciseMeasurements({ selectedAthlete }: ExerciseMeasur
         // Use the last 30 days as the date range
         const { startDate, endDate } = getLast30DaysRange();
         
-        // Fetch measurements for all exercises for the last 30 days
+        // Fetch measurements for the last 30 days
         // If an athlete is selected, only fetch their measurements
         const athleteIds = selectedAthlete ? [selectedAthlete.id] : [];
+        console.log("Fetching measurements with athlete IDs:", athleteIds);
+        
         const measurementsData = await getExerciseMeasurements(startDate, endDate, [], athleteIds);
-        setMeasurements(measurementsData);
+        
+        // Log measurements data for debugging
+        if (selectedAthlete) {
+          console.log(`Got ${measurementsData.length} measurements for ${selectedAthlete.fullName}`);
+          
+          // Double-check to make sure all measurements are for this athlete 
+          const filteredData = measurementsData.filter(m => m.athleteId === selectedAthlete.id);
+          console.log(`After filtering: ${filteredData.length} measurements belong to ${selectedAthlete.fullName}`);
+          
+          // Use the filtered data to ensure we only have the right athlete's data
+          setMeasurements(filteredData);
+        } else {
+          console.log(`Got ${measurementsData.length} measurements for all athletes`);
+          setMeasurements(measurementsData);
+        }
         
         // If there are exercises, set the first one as selected
         if (exercisesData.length > 0 && exercisesData[0]) {
@@ -49,6 +66,9 @@ export default function ExerciseMeasurements({ selectedAthlete }: ExerciseMeasur
       }
     }
 
+    // Clear the chart data when athlete changes to avoid showing previous data
+    setChartData([]);
+    
     fetchData();
   }, [selectedAthlete]); // Re-fetch when selectedAthlete changes
 
@@ -58,26 +78,50 @@ export default function ExerciseMeasurements({ selectedAthlete }: ExerciseMeasur
     
     // Filter measurements for the selected exercise
     const exerciseMeasurements = measurements.filter(m => m.exerciseId === selectedExercise);
+    console.log(`Filtered to ${exerciseMeasurements.length} measurements for exercise ${selectedExercise}`);
     
     // Process data for the chart
     const processedData = exerciseMeasurements.map(measurement => {
-      const date = new Date(measurement.completedDate);
-      const formattedDate = `${date.getMonth() + 1}/${date.getDate()}`;
+      // Ensure we have proper date handling
+      let formattedDate = '';
+      let formattedFullDate = new Date();
       
-      // Create a base object with the date
+      try {
+        const date = new Date(measurement.completedDate);
+        if (!isNaN(date.getTime())) {
+          formattedDate = `${date.getMonth() + 1}/${date.getDate()}`;
+          formattedFullDate = date;
+        } else {
+          console.error('Invalid date in measurement:', measurement.completedDate);
+        }
+      } catch (error) {
+        console.error('Error processing date:', error);
+      }
+      
+      // Create a base object with the date and athlete info
       const dataPoint: any = {
+        id: measurement.id,
         date: formattedDate,
-        fullDate: date,
-        athleteName: `${measurement.athleteFirstName} ${measurement.athleteLastName}`
+        fullDate: formattedFullDate,
+        rawDate: measurement.completedDate,
+        athleteId: measurement.athleteId,
+        athleteName: `${measurement.athleteFirstName} ${measurement.athleteLastName}`,
+        exerciseId: measurement.exerciseId,
+        exerciseCategory: measurement.exerciseCategory,
+        exerciseType: measurement.exerciseType,
+        variant: measurement.variant || 'Standard'
       };
       
-      // Add all metrics to the data point
+      // Add all metrics to the data point with proper field names
       measurement.metrics.forEach(metric => {
         dataPoint[metric.field] = metric.value;
       });
       
       return dataPoint;
     });
+    
+    // Log the processed data for debugging
+    console.log('Processed chart data:', processedData);
     
     // Sort by date
     processedData.sort((a, b) => a.fullDate.getTime() - b.fullDate.getTime());
@@ -88,12 +132,55 @@ export default function ExerciseMeasurements({ selectedAthlete }: ExerciseMeasur
   const getUniqueMetricFields = () => {
     if (chartData.length === 0) return [];
     
-    // Get all metric fields except date, fullDate, and athleteName
+    // Get all metric fields excluding non-metric properties
+    const excludedFields = ['id', 'date', 'fullDate', 'rawDate', 'athleteId', 'athleteName', 
+                           'exerciseId', 'exerciseCategory', 'exerciseType', 'variant'];
+    
     const fields = Object.keys(chartData[0]).filter(
-      key => key !== 'date' && key !== 'fullDate' && key !== 'athleteName'
+      key => !excludedFields.includes(key)
     );
     
     return fields;
+  };
+
+  // Format the date to be more readable
+  const formatDateDisplay = (dateString: string) => {
+    try {
+      // Make sure we're dealing with a valid date string
+      if (!dateString) return 'Invalid date';
+      
+      const date = new Date(dateString);
+      
+      // Check if date is valid
+      if (isNaN(date.getTime())) {
+        console.error('Invalid date string:', dateString);
+        return 'Invalid date';
+      }
+      
+      // Format as MM/DD
+      return `${date.getMonth() + 1}/${date.getDate()}`;
+    } catch (error) {
+      console.error('Error formatting date:', error);
+      return 'Invalid date';
+    }
+  };
+
+  // Get current exercise name and details
+  const getCurrentExerciseName = () => {
+    if (!selectedExercise) return 'No exercise selected';
+    const exercise = exercises.find(e => e.id === selectedExercise);
+    return exercise ? `${exercise.name} (${exercise.category})` : 'Unknown exercise';
+  };
+
+  // Format the metric name for display by capitalizing and adding spaces
+  const formatMetricName = (metricField: string) => {
+    // Convert camelCase to Title Case With Spaces
+    return metricField
+      // Insert a space before capital letters
+      .replace(/([A-Z])/g, ' $1')
+      // Capitalize the first letter
+      .replace(/^./, (str) => str.toUpperCase())
+      .trim();
   };
 
   if (loading) {
@@ -204,7 +291,7 @@ export default function ExerciseMeasurements({ selectedAthlete }: ExerciseMeasur
                       dataKey={field} 
                       stroke={colors[index % colors.length]} 
                       activeDot={{ r: 8 }} 
-                      name={field}
+                      name={formatMetricName(field)}
                     />
                   );
                 })}
@@ -213,38 +300,54 @@ export default function ExerciseMeasurements({ selectedAthlete }: ExerciseMeasur
           </div>
           
           <div className="mt-8">
-            <h4 className="mb-3 text-lg font-medium text-white">Measurement Details</h4>
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-full table-auto">
-                <thead>
-                  <tr className="border-b border-gray-700">
-                    <th className="px-4 py-2 text-left font-medium text-gray-300">Date</th>
-                    <th className="px-4 py-2 text-left font-medium text-gray-300">Athlete</th>
-                    {getUniqueMetricFields().map(field => (
-                      <th key={field} className="px-4 py-2 text-left font-medium text-gray-300">
-                        {field}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {chartData.map((dataPoint, index) => (
-                    <tr 
-                      key={index} 
-                      className="border-b border-gray-800 hover:bg-white/5"
-                    >
-                      <td className="px-4 py-3 text-white">{dataPoint.date}</td>
-                      <td className="px-4 py-3 text-gray-300">{dataPoint.athleteName}</td>
+            <h4 className="mb-3 text-lg font-medium text-white">
+              Measurement Details
+              {selectedAthlete && ` for ${selectedAthlete.fullName}`}
+            </h4>
+            
+            {chartData.length === 0 ? (
+              <div className="rounded-md bg-amber-500/20 p-4 text-center text-white">
+                <p>No measurement data available for {getCurrentExerciseName()}</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-full table-auto">
+                  <thead>
+                    <tr className="border-b border-gray-700">
+                      <th className="px-4 py-2 text-left font-medium text-gray-300">Date</th>
+                      <th className="px-4 py-2 text-left font-medium text-gray-300">Athlete</th>
+                      <th className="px-4 py-2 text-left font-medium text-gray-300">Variant</th>
                       {getUniqueMetricFields().map(field => (
-                        <td key={field} className="px-4 py-3 text-gray-300">
-                          {dataPoint[field]?.toFixed(2) || 'N/A'}
-                        </td>
+                        <th key={field} className="px-4 py-2 text-left font-medium text-gray-300">
+                          {formatMetricName(field)}
+                        </th>
                       ))}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {chartData.map((dataPoint, index) => (
+                      <tr 
+                        key={dataPoint.id || index} 
+                        className="border-b border-gray-800 hover:bg-white/5"
+                      >
+                        <td className="px-4 py-3 text-white">
+                          {dataPoint.date || formatDateDisplay(dataPoint.rawDate)}
+                        </td>
+                        <td className="px-4 py-3 text-gray-300">{dataPoint.athleteName}</td>
+                        <td className="px-4 py-3 text-gray-300">{dataPoint.variant}</td>
+                        {getUniqueMetricFields().map(field => (
+                          <td key={field} className="px-4 py-3 text-gray-300">
+                            {typeof dataPoint[field] === 'number' 
+                              ? dataPoint[field].toFixed(2) 
+                              : dataPoint[field] || 'N/A'}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </div>
       ) : (
@@ -258,4 +361,4 @@ export default function ExerciseMeasurements({ selectedAthlete }: ExerciseMeasur
       )}
     </div>
   );
-} 
+}

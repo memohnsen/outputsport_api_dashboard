@@ -101,14 +101,30 @@ export default function AthleteList({ selectedAthlete, onAthleteSelect }: Athlet
     if (athleteId) {
       const athlete = athletes.find(a => a.id === athleteId) || null;
       console.log('Selected athlete:', athlete);
+      
+      // Clear measurements first to prevent showing previous data
+      setAthleteMeasurements([]);
+      
+      // Update the selected athlete at the parent level
       onAthleteSelect(athlete);
-      // Clear previous measurements when switching athletes
-      setAthleteMeasurements([]);
+      
+      setDebugInfo(`Selected athlete: ${athlete?.fullName} (ID: ${athlete?.id})`);
     } else {
-      onAthleteSelect(null);
+      // Clear measurements and athlete selection
       setAthleteMeasurements([]);
+      onAthleteSelect(null);
+      setDebugInfo('No athlete selected');
     }
   };
+
+  // Log when the selectedAthlete prop changes
+  useEffect(() => {
+    if (selectedAthlete) {
+      console.log(`AthleteList received selectedAthlete: ${selectedAthlete.fullName}`);
+    } else {
+      console.log('AthleteList received null selectedAthlete');
+    }
+  }, [selectedAthlete]);
 
   // Get the most common exercise category for the athlete
   const getTopExercise = () => {
