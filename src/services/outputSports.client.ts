@@ -71,29 +71,50 @@ export async function getExerciseMetadata(): Promise<ExerciseMetadata[]> {
  * Get exercise measurements from Output Sports API
  */
 export async function getExerciseMeasurements(
-  startDate: Date,
-  endDate: Date,
+  startDate: string | Date,
+  endDate: string | Date,
   exerciseMetadataIds: string[] = [],
   athleteIds: string[] = []
 ): Promise<ExerciseMeasurement[]> {
-  const response = await fetch('/api/output/exercises/measurements', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      startDate: startDate.toISOString(),
-      endDate: endDate.toISOString(),
-      exerciseMetadataIds,
-      athleteIds,
-    }),
-  });
-  
-  if (!response.ok) {
-    throw new Error(`Failed to fetch exercise measurements: ${response.statusText}`);
+  try {
+    // Convert dates to strings if they're Date objects
+    const startDateStr = typeof startDate === 'string' 
+      ? startDate 
+      : startDate.toISOString().split('T')[0];
+    
+    const endDateStr = typeof endDate === 'string' 
+      ? endDate 
+      : endDate.toISOString().split('T')[0];
+    
+    console.log(`Client: Sending request with string date range ${startDateStr} to ${endDateStr}`);
+    
+    const response = await fetch('/api/output/exercises/measurements', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        startDate: startDateStr,
+        endDate: endDateStr,
+        exerciseMetadataIds,
+        athleteIds,
+      }),
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => null);
+      const errorMessage = errorData?.error || response.statusText;
+      console.error(`API error: ${response.status} ${errorMessage}`);
+      throw new Error(`Failed to fetch exercise measurements: ${errorMessage}`);
+    }
+    
+    const data = await response.json();
+    console.log(`Client: Received ${data.length} measurements`);
+    return data;
+  } catch (error) {
+    console.error('Client error fetching measurements:', error);
+    throw error;
   }
-  
-  return response.json();
 }
 
 // Helper function to calculate date range for last 30 days

@@ -1,84 +1,263 @@
 "use client";
 
 import { useEffect, useState } from 'react';
-import { getExerciseMeasurements, getExerciseMetadata, getLast30DaysRange } from '@/services/outputSports.client';
+import { getExerciseMeasurements, getExerciseMetadata } from '@/services/outputSports.client';
 import type { ExerciseMetadata, ExerciseMeasurement, Athlete } from '@/services/outputSports.client';
 import { LineChart as RechartsLineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
+type TimeRange = 'today' | '7days' | '30days' | '90days' | 'year' | 'all';
+
 interface ExerciseMeasurementsProps {
   selectedAthlete: Athlete | null;
+  timeRange: TimeRange;
 }
 
-export default function ExerciseMeasurements({ selectedAthlete }: ExerciseMeasurementsProps) {
+export default function ExerciseMeasurements({ selectedAthlete, timeRange }: ExerciseMeasurementsProps) {
   const [measurements, setMeasurements] = useState<ExerciseMeasurement[]>([]);
+  const [allMeasurements, setAllMeasurements] = useState<ExerciseMeasurement[]>([]);
   const [exercises, setExercises] = useState<ExerciseMetadata[]>([]);
+  const [filteredExercises, setFilteredExercises] = useState<ExerciseMetadata[]>([]);
   const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedExercise, setSelectedExercise] = useState<string | null>(null);
   const [chartData, setChartData] = useState<any[]>([]);
 
+  // Get date range based on selected time range
+  const getDateRange = () => {
+    const now = new Date();
+    const formatDateString = (date: Date) => {
+      return date.toISOString().split('T')[0]; // YYYY-MM-DD format
+    };
+    
+    // Current date as end date
+    const endDateStr = formatDateString(now);
+    let startDateStr;
+    
+    // Calculate date ranges based on selected option
+    switch(timeRange) {
+      case 'today':
+        // Today's date
+        startDateStr = endDateStr;
+        break;
+      case '7days':
+        // 7 days ago
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(now.getDate() - 7);
+        startDateStr = formatDateString(sevenDaysAgo);
+        break;
+      case '30days':
+        // 30 days ago
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(now.getDate() - 30);
+        startDateStr = formatDateString(thirtyDaysAgo);
+        break;
+      case '90days':
+        // 90 days - maximum recommended range based on API behavior
+        const ninetyDaysAgo = new Date();
+        ninetyDaysAgo.setDate(now.getDate() - 90);
+        startDateStr = formatDateString(ninetyDaysAgo);
+        break;
+      case 'year':
+        // Limit to 90 days for "year" option since API seems to reject larger ranges
+        const yearLimited = new Date();
+        yearLimited.setDate(now.getDate() - 90);
+        startDateStr = formatDateString(yearLimited);
+        break;
+      case 'all':
+        // Also limit "all time" to 90 days based on API behavior in logs
+        const allTimeLimited = new Date();
+        allTimeLimited.setDate(now.getDate() - 90);
+        startDateStr = formatDateString(allTimeLimited);
+        break;
+      default:
+        // Default to 30 days
+        const defaultDate = new Date();
+        defaultDate.setDate(now.getDate() - 30);
+        startDateStr = formatDateString(defaultDate);
+    }
+    
+    console.log(`Using date range: ${startDateStr} to ${endDateStr} for ${timeRange}`);
+    
+    // Return the date strings directly
+    return { 
+      startDateStr,
+      endDateStr
+    };
+  };
+
+  // Initial data fetch for all measurements
   useEffect(() => {
-    async function fetchData() {
+    async function fetchInitialData() {
       try {
-        setLoading(true);
-        console.log("Fetching data with selected athlete:", selectedAthlete?.fullName);
+        setInitialLoading(true);
+        console.log("Initial data fetch for all measurements and metadata");
         
-        // First, fetch metadata to get exercise IDs
+        // Fetch all exercise metadata
         const exercisesData = await getExerciseMetadata();
         setExercises(exercisesData);
         
-        // Use the last 30 days as the date range
-        const { startDate, endDate } = getLast30DaysRange();
+        // Get a reasonably large date range (1 year)
+        const endDate = new Date();
+        const startDate = new Date();
+        startDate.setFullYear(endDate.getFullYear() - 1);
         
-        // Fetch measurements for the last 30 days
-        // If an athlete is selected, only fetch their measurements
+        const startDateStr = startDate.toISOString().split('T')[0];
+        const endDateStr = endDate.toISOString().split('T')[0];
+        
+        console.log(`Fetching all measurements from ${startDateStr} to ${endDateStr}`);
+        
+        // Fetch all measurements for the selected athlete (or all athletes)
         const athleteIds = selectedAthlete ? [selectedAthlete.id] : [];
-        console.log("Fetching measurements with athlete IDs:", athleteIds);
         
-        const measurementsData = await getExerciseMeasurements(startDate, endDate, [], athleteIds);
-        
-        // Log measurements data for debugging
-        if (selectedAthlete) {
-          console.log(`Got ${measurementsData.length} measurements for ${selectedAthlete.fullName}`);
+        try {
+          // Make a single API call to get measurements for a full year
+          if (startDateStr && endDateStr) {
+            const allMeasurementsData = await getExerciseMeasurements(startDateStr, endDateStr, [], athleteIds);
+            console.log(`Successfully fetched ${allMeasurementsData.length} total measurements`);
+            
+            // Filter the measurements for the selected athlete if needed
+            const filteredAllData = selectedAthlete 
+              ? allMeasurementsData.filter(m => m.athleteId === selectedAthlete.id)
+              : allMeasurementsData;
+            
+            console.log(`Total measurements after filtering: ${filteredAllData.length}`);
+            
+            // Store all measurements for later filtering by date range
+            setAllMeasurements(filteredAllData);
+            
+            // Initial filtering by current time range
+            filterMeasurementsByTimeRange(filteredAllData, timeRange);
+          }
+        } catch (error) {
+          console.error('Error fetching all measurements:', error);
           
-          // Double-check to make sure all measurements are for this athlete 
-          const filteredData = measurementsData.filter(m => m.athleteId === selectedAthlete.id);
-          console.log(`After filtering: ${filteredData.length} measurements belong to ${selectedAthlete.fullName}`);
-          
-          // Use the filtered data to ensure we only have the right athlete's data
-          setMeasurements(filteredData);
-        } else {
-          console.log(`Got ${measurementsData.length} measurements for all athletes`);
-          setMeasurements(measurementsData);
+          // Try a smaller range as fallback (3 months)
+          try {
+            console.log("Trying fallback with 90 days instead of 1 year");
+            const fallbackStartDate = new Date();
+            fallbackStartDate.setDate(fallbackStartDate.getDate() - 90);
+            
+            const fallbackStartStr = fallbackStartDate.toISOString().split('T')[0];
+            const fallbackAllMeasurements = await getExerciseMeasurements(
+              fallbackStartStr || '', 
+              endDateStr || '', 
+              [], 
+              athleteIds
+            );
+            
+            console.log(`Fallback successful: got ${fallbackAllMeasurements.length} measurements for 90 days`);
+            
+            // Filter for selected athlete if needed
+            const filteredFallbackData = selectedAthlete 
+              ? fallbackAllMeasurements.filter(m => m.athleteId === selectedAthlete.id)
+              : fallbackAllMeasurements;
+            
+            setAllMeasurements(filteredFallbackData);
+            filterMeasurementsByTimeRange(filteredFallbackData, timeRange);
+            setError('Limited to last 90 days of data');
+            setTimeout(() => setError(null), 5000);
+          } catch (fallbackError) {
+            console.error('Fallback also failed:', fallbackError);
+            setError('Failed to load measurement data. Try selecting a specific time range.');
+            setAllMeasurements([]);
+          }
         }
-        
-        // If there are exercises, set the first one as selected
-        if (exercisesData.length > 0 && exercisesData[0]) {
-          setSelectedExercise(exercisesData[0].id);
-        }
-        
-        setError(null);
       } catch (err) {
-        console.error('Failed to fetch exercise data:', err);
-        setError('Failed to load exercise data. Please try again later.');
+        console.error('Failed to fetch initial data:', err);
+        if (err instanceof Error) {
+          setError(`Failed to load data: ${err.message}`);
+        } else {
+          setError('Failed to load data. Please try again later.');
+        }
       } finally {
-        setLoading(false);
+        setInitialLoading(false);
       }
     }
-
-    // Clear the chart data when athlete changes to avoid showing previous data
-    setChartData([]);
     
-    fetchData();
-  }, [selectedAthlete]); // Re-fetch when selectedAthlete changes
+    fetchInitialData();
+  }, [selectedAthlete]); // Only re-fetch all data when athlete changes
+  
+  // Function to filter measurements by time range
+  const filterMeasurementsByTimeRange = (measurements: ExerciseMeasurement[], currentTimeRange: TimeRange) => {
+    setLoading(true);
+    
+    const { startDateStr, endDateStr } = getDateRange();
+    console.log(`Filtering measurements for time range: ${currentTimeRange} (${startDateStr} to ${endDateStr})`);
+    
+    try {
+      // Convert string dates to Date objects for comparison
+      const startDate = startDateStr ? new Date(startDateStr) : new Date();
+      const endDate = endDateStr ? new Date(endDateStr) : new Date();
+      endDate.setHours(23, 59, 59, 999); // Include the entire end date
+      
+      // Filter measurements by date range
+      const filteredByDate = measurements.filter(measurement => {
+        const measurementDate = new Date(measurement.completedDate);
+        return measurementDate >= startDate && measurementDate <= endDate;
+      });
+      
+      console.log(`Filtered to ${filteredByDate.length} measurements for the selected time range`);
+      
+      // Update measurements state with filtered data
+      setMeasurements(filteredByDate);
+      
+      // Get unique exercise IDs from the filtered measurements
+      const exerciseIdsWithData = new Set(filteredByDate.map(m => m.exerciseId));
+      
+      // Filter the exercises metadata to only include exercises with data
+      const availableExercises = exercises.filter(exercise => 
+        exerciseIdsWithData.has(exercise.id)
+      );
+      
+      console.log(`Found ${availableExercises.length} exercises with data for this time range`);
+      setFilteredExercises(availableExercises);
+      
+      // Update selected exercise if needed
+      if (selectedExercise && !exerciseIdsWithData.has(selectedExercise)) {
+        if (availableExercises.length > 0 && availableExercises[0]?.id) {
+          console.log(`Selected exercise ${selectedExercise} has no data in this range, switching to ${availableExercises[0].id}`);
+          setSelectedExercise(availableExercises[0].id);
+        } else {
+          setSelectedExercise(null);
+        }
+      } else if (!selectedExercise && availableExercises.length > 0 && availableExercises[0]?.id) {
+        setSelectedExercise(availableExercises[0].id);
+      }
+      
+      setError(null);
+    } catch (err) {
+      console.error('Error filtering measurements:', err);
+      setError('Error filtering data by date range');
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  // Filter measurements when time range changes
+  useEffect(() => {
+    if (allMeasurements.length > 0) {
+      filterMeasurementsByTimeRange(allMeasurements, timeRange);
+    }
+  }, [timeRange, allMeasurements, exercises]);
 
   // Update chart data when selected exercise changes or measurements are loaded
   useEffect(() => {
-    if (!selectedExercise || measurements.length === 0) return;
+    if (!selectedExercise || measurements.length === 0) {
+      // Clear chart data if there are no measurements but preserve selected exercise
+      setChartData([]);
+      return;
+    }
     
     // Filter measurements for the selected exercise
     const exerciseMeasurements = measurements.filter(m => m.exerciseId === selectedExercise);
     console.log(`Filtered to ${exerciseMeasurements.length} measurements for exercise ${selectedExercise}`);
+    
+    if (exerciseMeasurements.length === 0) {
+      // No measurements for this exercise in the selected time range
+      setChartData([]);
+      return;
+    }
     
     // Process data for the chart
     const processedData = exerciseMeasurements.map(measurement => {
@@ -121,13 +300,26 @@ export default function ExerciseMeasurements({ selectedAthlete }: ExerciseMeasur
     });
     
     // Log the processed data for debugging
-    console.log('Processed chart data:', processedData);
+    console.log(`Processed chart data: ${processedData.length} data points for ${timeRange}`);
     
     // Sort by date
     processedData.sort((a, b) => a.fullDate.getTime() - b.fullDate.getTime());
     
     setChartData(processedData);
-  }, [selectedExercise, measurements]);
+  }, [selectedExercise, measurements, timeRange]);
+
+  // Update the time range text in the subtitle
+  const getTimeRangeText = () => {
+    switch(timeRange) {
+      case 'today': return 'Today';
+      case '7days': return 'Last 7 days';
+      case '30days': return 'Last 30 days';
+      case '90days': return 'Last 90 days';
+      case 'year': return 'Last year';
+      case 'all': return 'All time';
+      default: return 'Last 30 days';
+    }
+  };
 
   const getUniqueMetricFields = () => {
     if (chartData.length === 0) return [];
@@ -172,6 +364,13 @@ export default function ExerciseMeasurements({ selectedAthlete }: ExerciseMeasur
     return exercise ? `${exercise.name} (${exercise.category})` : 'Unknown exercise';
   };
 
+  // Handle exercise selection change
+  const handleExerciseChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const exerciseId = e.target.value;
+    console.log(`Changing selected exercise to: ${exerciseId}`);
+    setSelectedExercise(exerciseId);
+  };
+
   // Format the metric name for display by capitalizing and adding spaces
   const formatMetricName = (metricField: string) => {
     // Convert camelCase to Title Case With Spaces
@@ -183,12 +382,24 @@ export default function ExerciseMeasurements({ selectedAthlete }: ExerciseMeasur
       .trim();
   };
 
-  if (loading) {
+  if (initialLoading) {
     return (
-      <div className="w-full rounded-xl bg-white/5 p-6 backdrop-blur-sm">
+      <div className="w-full rounded-xl bg-[#1a1a1a] p-6 backdrop-blur-sm border border-[#8C8C8C]/10">
         <h3 className="mb-4 text-xl font-semibold text-white">Exercise Measurements</h3>
         <div className="flex items-center justify-center py-8">
-          <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-t-2 border-purple-500"></div>
+          <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-t-2 border-[#887D2B]"></div>
+          <span className="ml-2 text-white">Loading exercise data...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="w-full rounded-xl bg-[#1a1a1a] p-6 backdrop-blur-sm border border-[#8C8C8C]/10">
+        <h3 className="mb-4 text-xl font-semibold text-white">Exercise Measurements</h3>
+        <div className="flex items-center justify-center py-8">
+          <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-t-2 border-[#887D2B]"></div>
           <span className="ml-2 text-white">Loading exercise data...</span>
         </div>
       </div>
@@ -197,12 +408,12 @@ export default function ExerciseMeasurements({ selectedAthlete }: ExerciseMeasur
 
   if (error) {
     return (
-      <div className="w-full rounded-xl bg-white/5 p-6 backdrop-blur-sm">
+      <div className="w-full rounded-xl bg-[#1a1a1a] p-6 backdrop-blur-sm border border-[#8C8C8C]/10">
         <h3 className="mb-4 text-xl font-semibold text-white">Exercise Measurements</h3>
         <div className="rounded-md bg-red-500/20 p-4 text-center text-white">
           <p>{error}</p>
           <button 
-            className="mt-3 rounded bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700"
+            className="mt-3 rounded bg-[#887D2B] px-4 py-2 text-sm font-medium text-white hover:bg-[#776c25]"
             onClick={() => window.location.reload()}
           >
             Retry
@@ -214,9 +425,9 @@ export default function ExerciseMeasurements({ selectedAthlete }: ExerciseMeasur
 
   if (exercises.length === 0) {
     return (
-      <div className="w-full rounded-xl bg-white/5 p-6 backdrop-blur-sm">
+      <div className="w-full rounded-xl bg-[#1a1a1a] p-6 backdrop-blur-sm border border-[#8C8C8C]/10">
         <h3 className="mb-4 text-xl font-semibold text-white">Exercise Measurements</h3>
-        <div className="text-center text-gray-400">
+        <div className="text-center text-[#8C8C8C]">
           <p>No exercise data available</p>
         </div>
       </div>
@@ -224,40 +435,74 @@ export default function ExerciseMeasurements({ selectedAthlete }: ExerciseMeasur
   }
 
   return (
-    <div className="w-full rounded-xl bg-white/5 p-6 backdrop-blur-sm">
+    <div className="w-full rounded-xl bg-[#1a1a1a] p-6 backdrop-blur-sm border border-[#8C8C8C]/10">
       <h3 className="mb-4 text-xl font-semibold text-white">
         {selectedAthlete ? `${selectedAthlete.fullName}'s ` : ''}Exercise Measurements
       </h3>
       
+      {!selectedAthlete && (
+        <div className="mb-4 rounded-md bg-[#887D2B]/10 p-4 text-center">
+          <p className="text-[#8C8C8C]">
+            Select an athlete from the dropdown above to view their specific measurements.
+            Currently showing data for all athletes.
+          </p>
+        </div>
+      )}
+      
       <div className="mb-6">
-        <label htmlFor="exercise-select" className="mb-2 block text-sm font-medium text-gray-400">
+        <label htmlFor="exercise-select" className="mb-2 block text-sm font-medium text-[#8C8C8C]">
           Select Exercise:
         </label>
-        <select
-          id="exercise-select"
-          className="w-full rounded-md border-gray-700 bg-white/10 px-3 py-2 text-white focus:border-purple-500 focus:ring focus:ring-purple-500/30"
-          value={selectedExercise || ''}
-          onChange={(e) => setSelectedExercise(e.target.value)}
-        >
-          {exercises.map(exercise => (
-            <option key={exercise.id} value={exercise.id}>
-              {exercise.name} ({exercise.category})
-            </option>
-          ))}
-        </select>
+        {filteredExercises.length > 0 ? (
+          <select
+            id="exercise-select"
+            className="w-full rounded-md border-[#8C8C8C]/20 bg-[#1a1a1a] px-3 py-2 text-white focus:border-[#887D2B] focus:ring focus:ring-[#887D2B]/30"
+            value={selectedExercise || ''}
+            onChange={handleExerciseChange}
+          >
+            {filteredExercises.map(exercise => (
+              <option key={exercise.id} value={exercise.id}>
+                {exercise.name} ({exercise.category})
+              </option>
+            ))}
+          </select>
+        ) : (
+          <div className="rounded-md bg-[#0D0D0D]/90 p-4 text-center text-[#8C8C8C] border border-[#8C8C8C]/10">
+            <p>
+              {selectedAthlete
+                ? `No exercises with data for ${selectedAthlete.fullName} in the selected time range.`
+                : 'No exercises with data in the selected time range.'}
+            </p>
+          </div>
+        )}
       </div>
       
-      {chartData.length > 0 ? (
+      {filteredExercises.length === 0 ? (
+        <div className="mt-4 rounded-md bg-[#0D0D0D]/90 p-6 text-center text-white border border-[#8C8C8C]/10">
+          <div className="mx-auto mb-4 h-16 w-16 text-[#887D2B]">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <h4 className="mb-2 text-lg font-medium text-white">No Measurement Data Available</h4>
+          <p className="text-[#8C8C8C]">
+            {selectedAthlete 
+              ? `There are no exercises with data for ${selectedAthlete.fullName} in the selected time range.`
+              : 'There are no exercises with data in the selected time range.'}
+          </p>
+          <p className="mt-2 text-[#8C8C8C]">Try selecting a different time range or athlete.</p>
+        </div>
+      ) : chartData.length > 0 ? (
         <div>
           <div className="mb-4">
             <h4 className="text-lg font-medium text-white">
               {exercises.find(e => e.id === selectedExercise)?.name} Performance Trends
               {selectedAthlete ? ` for ${selectedAthlete.fullName}` : ''}
             </h4>
-            <p className="text-sm text-gray-400">Last 30 days data visualization</p>
+            <p className="text-sm text-[#8C8C8C]">{getTimeRangeText()} data visualization</p>
           </div>
           
-          <div className="h-96 w-full">
+          <div className="h-96 w-full bg-[#1a1a1a]/80 rounded-lg p-2">
             <ResponsiveContainer width="100%" height="100%">
               <RechartsLineChart
                 data={chartData}
@@ -268,22 +513,22 @@ export default function ExerciseMeasurements({ selectedAthlete }: ExerciseMeasur
                   bottom: 5,
                 }}
               >
-                <CartesianGrid strokeDasharray="3 3" stroke="#444" />
-                <XAxis dataKey="date" stroke="#ccc" />
-                <YAxis stroke="#ccc" />
+                <CartesianGrid strokeDasharray="3 3" stroke="#333" />
+                <XAxis dataKey="date" stroke="#8C8C8C" />
+                <YAxis stroke="#8C8C8C" />
                 <Tooltip 
                   contentStyle={{ 
-                    backgroundColor: 'rgba(50, 50, 50, 0.95)',
-                    borderColor: '#666',
+                    backgroundColor: 'rgba(40, 40, 40, 0.95)',
+                    borderColor: '#8C8C8C',
                     color: 'white'
                   }}
                   formatter={(value, name) => [value, name]}
                   labelFormatter={(label) => `Date: ${label}`}
                 />
-                <Legend wrapperStyle={{ color: '#ccc' }} />
+                <Legend wrapperStyle={{ color: '#8C8C8C' }} />
                 
                 {getUniqueMetricFields().map((field, index) => {
-                  const colors = ['#8884d8', '#82ca9d', '#ffc658', '#ff8042', '#0088fe'];
+                  const colors = ['#887D2B', '#A19543', '#7A705F', '#BFAF30', '#D6C12B'];
                   return (
                     <Line 
                       key={field}
@@ -310,15 +555,15 @@ export default function ExerciseMeasurements({ selectedAthlete }: ExerciseMeasur
                 <p>No measurement data available for {getCurrentExerciseName()}</p>
               </div>
             ) : (
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto bg-[#1a1a1a]/80 rounded-lg">
                 <table className="w-full min-w-full table-auto">
                   <thead>
-                    <tr className="border-b border-gray-700">
-                      <th className="px-4 py-2 text-left font-medium text-gray-300">Date</th>
-                      <th className="px-4 py-2 text-left font-medium text-gray-300">Athlete</th>
-                      <th className="px-4 py-2 text-left font-medium text-gray-300">Variant</th>
+                    <tr className="border-b border-[#8C8C8C]/30">
+                      <th className="px-4 py-2 text-left font-medium text-[#8C8C8C]">Date</th>
+                      <th className="px-4 py-2 text-left font-medium text-[#8C8C8C]">Athlete</th>
+                      <th className="px-4 py-2 text-left font-medium text-[#8C8C8C]">Variant</th>
                       {getUniqueMetricFields().map(field => (
-                        <th key={field} className="px-4 py-2 text-left font-medium text-gray-300">
+                        <th key={field} className="px-4 py-2 text-left font-medium text-[#8C8C8C]">
                           {formatMetricName(field)}
                         </th>
                       ))}
@@ -328,15 +573,13 @@ export default function ExerciseMeasurements({ selectedAthlete }: ExerciseMeasur
                     {chartData.map((dataPoint, index) => (
                       <tr 
                         key={dataPoint.id || index} 
-                        className="border-b border-gray-800 hover:bg-white/5"
+                        className="border-b border-[#8C8C8C]/10 hover:bg-[#0D0D0D]/70"
                       >
-                        <td className="px-4 py-3 text-white">
-                          {dataPoint.date || formatDateDisplay(dataPoint.rawDate)}
-                        </td>
-                        <td className="px-4 py-3 text-gray-300">{dataPoint.athleteName}</td>
-                        <td className="px-4 py-3 text-gray-300">{dataPoint.variant}</td>
+                        <td className="px-4 py-3 text-white">{dataPoint.date || formatDateDisplay(dataPoint.rawDate)}</td>
+                        <td className="px-4 py-3 text-[#8C8C8C]">{dataPoint.athleteName}</td>
+                        <td className="px-4 py-3 text-[#8C8C8C]">{dataPoint.variant}</td>
                         {getUniqueMetricFields().map(field => (
-                          <td key={field} className="px-4 py-3 text-gray-300">
+                          <td key={field} className="px-4 py-3 text-[#8C8C8C]">
                             {typeof dataPoint[field] === 'number' 
                               ? dataPoint[field].toFixed(2) 
                               : dataPoint[field] || 'N/A'}
@@ -351,11 +594,14 @@ export default function ExerciseMeasurements({ selectedAthlete }: ExerciseMeasur
           </div>
         </div>
       ) : (
-        <div className="rounded-md bg-blue-500/20 p-4 text-center text-white">
+        <div className="rounded-md bg-[#0D0D0D]/90 p-4 text-center text-white border border-[#8C8C8C]/10">
           <p>
             {selectedAthlete 
-              ? `No measurement data available for ${selectedAthlete.fullName} on the selected exercise in the last 30 days.` 
-              : 'No measurement data available for the selected exercise in the last 30 days.'}
+              ? `No measurement data available for ${selectedAthlete.fullName} on the selected exercise for the ${getTimeRangeText().toLowerCase()}.` 
+              : `No measurement data available for the selected exercise for the ${getTimeRangeText().toLowerCase()}.`}
+          </p>
+          <p className="mt-2 text-sm text-[#8C8C8C]">
+            The exercise exists in this time range but has no data points to display.
           </p>
         </div>
       )}
