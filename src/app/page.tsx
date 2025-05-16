@@ -29,9 +29,6 @@ export default async function Home() {
               <li className="mr-2">
                 <a href="#" className="inline-block p-4 text-[#887D2B] border-b-2 border-[#887D2B] rounded-t-lg active">Output Sports API</a>
               </li>
-              <li className="mr-2">
-                <a href="#" className="inline-block p-4 text-[#8C8C8C] border-b-2 border-transparent rounded-t-lg hover:text-white hover:border-[#8C8C8C]">Sample Dashboard</a>
-              </li>
             </ul>
           </div>
           
@@ -43,10 +40,6 @@ export default async function Home() {
           }>
             <OutputDashboard />
           </Suspense>
-          
-          {/* Uncomment this to view the sample dashboard instead
-          <Dashboard />
-          */}
         </div>
       </main>
     </HydrateClient>

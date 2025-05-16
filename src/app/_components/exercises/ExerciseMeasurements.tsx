@@ -355,6 +355,15 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange }: Exe
       return;
     }
     
+    // Debug: Log all unique units for the selected exercise
+    const exercise = exercises.find(e => e.id === selectedExercise);
+    if (exercise) {
+      console.log('DEBUG - All metrics and units for current exercise:');
+      exercise.metrics.forEach(metric => {
+        console.log(`${metric.field}: "${metric.unitOfMeasure}"`);
+      });
+    }
+    
     // Process data for the chart
     const processedData = exerciseMeasurements.map(measurement => {
       // Ensure we have proper date handling
@@ -505,8 +514,104 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange }: Exe
     setSelectedExercise(exerciseId);
   };
 
-  // Format the metric name for display by capitalizing and adding spaces
-  const formatMetricName = (metricField: string) => {
+  // Get the unit of measure for a specific metric field
+  const getMetricUnit = (metricField: string): string => {
+    if (!selectedExercise) return '';
+    
+    const exercise = exercises.find(e => e.id === selectedExercise);
+    if (!exercise) return '';
+    
+    const metricInfo = exercise.metrics.find(m => m.field === metricField);
+    
+    // Log the actual unit for debugging
+    if (metricInfo?.unitOfMeasure && metricField === 'meanForce') {
+      console.log(`Unit for ${metricField}: "${metricInfo.unitOfMeasure}"`);
+    }
+    
+    return metricInfo?.unitOfMeasure || '';
+  };
+  
+  // Convert unit to shorthand format
+  const getShorthandUnit = (unit: string): string => {
+    // Handle null or empty units
+    if (!unit) return '';
+    
+    // Clean the input unit (trim whitespace, lowercase for case-insensitive matching)
+    const cleanUnit = unit.trim().toLowerCase();
+    
+    // Handle empty units
+    if (!cleanUnit) return '';
+    
+    // Use proper scientific units based on measurement type
+    const metricFieldToUnit: Record<string, string> = {
+      // Force metrics - Newtons (N)
+      'meanForce': 'N',
+      'peakForce': 'N',
+      'relativeForce': 'N',
+      'relativeMeanForce': 'N',
+      'relativePeakForce': 'N',
+      'bestMeanForce': 'N',
+      
+      // Velocity metrics - meters per second (m/s)
+      'meanVelocity': 'm/s',
+      'peakVelocity': 'm/s',
+      'meanPropulsiveVelocity': 'm/s',
+      'eccentricMeanVelocity': 'm/s',
+      'eccentricPeakVelocity': 'm/s',
+      'bestMeanVelocity': 'm/s',
+      
+      // Power metrics - Watts (W)
+      'meanPower': 'W',
+      'peakPower': 'W',
+      'relativeMeanPower': 'W',
+      'relativePeakPower': 'W',
+      'bestMeanPower': 'W',
+      
+      // Acceleration metrics - meters per second squared (m/s²)
+      'meanAcceleration': 'm/s²',
+      'peakAcceleration': 'm/s²',
+      
+      // Impulse metrics - Newton seconds (N·s)
+      'meanConcentricImpulse': 'N·s',
+      
+      // Other common metrics
+      'estimatedOneRepMax': 'kg',
+      'weight': 'kg',
+      'timeUnderTension': 's',
+      'totalWork': 'J',
+      'repCount': 'reps'
+    };
+    
+    // Find standard scientific units for physics quantities
+    if (/newton/i.test(cleanUnit)) return 'N';
+    if (/watt/i.test(cleanUnit)) return 'W';
+    if (/joule/i.test(cleanUnit)) return 'J';
+    if (/kilogram/i.test(cleanUnit)) return 'kg';
+    if (/second/i.test(cleanUnit) && !cleanUnit.includes('per')) return 's';
+    if (/percent/i.test(cleanUnit)) return '%';
+    if (/repetition/i.test(cleanUnit)) return 'reps';
+    
+    // Compound units
+    if (/(meter.*second.*squared|m.*s.*2|m\/s2)/i.test(cleanUnit)) return 'm/s²';
+    if (/(meter.*second|m.*s|m\/s)/i.test(cleanUnit)) return 'm/s';
+    if (/(newton.*second|n.*s|n-s)/i.test(cleanUnit)) return 'N·s';
+    
+    // Return common scientific units as is
+    if (unit === 'N') return 'N';
+    if (unit === 'W') return 'W';
+    if (unit === 'J') return 'J';
+    if (unit === 'kg') return 'kg';
+    if (unit === 's') return 's';
+    if (unit === 'm/s') return 'm/s';
+    if (unit === 'm/s²') return 'm/s²';
+    if (unit === 'N·s' || unit === 'N-s') return 'N·s';
+    
+    // Return the original unit if no match is found
+    return unit;
+  };
+
+  // Format the metric name for display by capitalizing and adding spaces (without units)
+  const formatMetricNameOnly = (metricField: string) => {
     // Convert camelCase to Title Case With Spaces
     return metricField
       // Insert a space before capital letters
@@ -514,6 +619,66 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange }: Exe
       // Capitalize the first letter
       .replace(/^./, (str) => str.toUpperCase())
       .trim();
+  };
+
+  // Format the metric name for display by capitalizing and adding spaces
+  const formatMetricName = (metricField: string) => {
+    // Get the base name without units
+    const name = formatMetricNameOnly(metricField);
+    
+    // Use proper scientific units based on measurement type
+    const metricFieldToUnit: Record<string, string> = {
+      // Force metrics - Newtons (N)
+      'meanForce': 'N',
+      'peakForce': 'N',
+      'relativeForce': 'N',
+      'relativeMeanForce': 'N',
+      'relativePeakForce': 'N',
+      'bestMeanForce': 'N',
+      
+      // Velocity metrics - meters per second (m/s)
+      'meanVelocity': 'm/s',
+      'peakVelocity': 'm/s',
+      'meanPropulsiveVelocity': 'm/s',
+      'eccentricMeanVelocity': 'm/s',
+      'eccentricPeakVelocity': 'm/s',
+      'bestMeanVelocity': 'm/s',
+      
+      // Power metrics - Watts (W)
+      'meanPower': 'W',
+      'peakPower': 'W',
+      'relativeMeanPower': 'W',
+      'relativePeakPower': 'W',
+      'bestMeanPower': 'W',
+      
+      // Acceleration metrics - meters per second squared (m/s²)
+      'meanAcceleration': 'm/s²',
+      'peakAcceleration': 'm/s²',
+      
+      // Impulse metrics - Newton seconds (N·s)
+      'meanConcentricImpulse': 'N·s',
+      
+      // Other common metrics
+      'estimatedOneRepMax': 'kg',
+      'weight': 'kg',
+      'timeUnderTension': 's',
+      'totalWork': 'J',
+      'repCount': 'reps'
+    };
+    
+    // Get the unit for this specific metric field if available
+    const knownUnit = metricFieldToUnit[metricField];
+    
+    // If we have a known unit for this field, use it
+    if (knownUnit) {
+      return `${name} (${knownUnit})`;
+    }
+    
+    // Otherwise, get the unit from the exercise metadata
+    const unit = getMetricUnit(metricField);
+    const standardizedUnit = unit ? getShorthandUnit(unit) : '';
+    
+    return standardizedUnit ? `${name} (${standardizedUnit})` : name;
   };
 
   if (initialLoading) {
@@ -640,10 +805,61 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange }: Exe
                       borderColor: '#8C8C8C',
                       color: 'white'
                     }}
-                    formatter={(value, name) => {
-                      // Ensure numeric values are rounded to 2 decimal places
-                      const formattedValue = typeof value === 'number' ? value.toFixed(2) : value;
-                      return [formattedValue, name];
+                    formatter={(value, name, props) => {
+                      if (typeof value !== 'number') return [value, name];
+                      
+                      // Extract the metric field name from the dataKey
+                      const metricField = String(props.dataKey);
+                      
+                      // Use proper scientific units based on measurement type
+                      const metricFieldToUnit: Record<string, string> = {
+                        // Force metrics - Newtons (N)
+                        'meanForce': 'N',
+                        'peakForce': 'N',
+                        'relativeForce': 'N',
+                        'relativeMeanForce': 'N',
+                        'relativePeakForce': 'N',
+                        'bestMeanForce': 'N',
+                        
+                        // Velocity metrics - meters per second (m/s)
+                        'meanVelocity': 'm/s',
+                        'peakVelocity': 'm/s',
+                        'meanPropulsiveVelocity': 'm/s',
+                        'eccentricMeanVelocity': 'm/s',
+                        'eccentricPeakVelocity': 'm/s',
+                        'bestMeanVelocity': 'm/s',
+                        
+                        // Power metrics - Watts (W)
+                        'meanPower': 'W',
+                        'peakPower': 'W',
+                        'relativeMeanPower': 'W',
+                        'relativePeakPower': 'W',
+                        'bestMeanPower': 'W',
+                        
+                        // Acceleration metrics - meters per second squared (m/s²)
+                        'meanAcceleration': 'm/s²',
+                        'peakAcceleration': 'm/s²',
+                        
+                        // Impulse metrics - Newton seconds (N·s)
+                        'meanConcentricImpulse': 'N·s',
+                        
+                        // Other common metrics
+                        'estimatedOneRepMax': 'kg',
+                        'weight': 'kg',
+                        'timeUnderTension': 's',
+                        'totalWork': 'J',
+                        'repCount': 'reps'
+                      };
+                      
+                      // Get the known unit for this field
+                      const unit = metricFieldToUnit[metricField] || getShorthandUnit(getMetricUnit(metricField));
+                      
+                      // Format the value with 2 decimal places and add the unit
+                      const formattedValue = unit 
+                        ? `${value.toFixed(2)} ${unit}` 
+                        : value.toFixed(2);
+                      
+                      return [formattedValue, String(name)];
                     }}
                     labelFormatter={(label) => `Date: ${label}`}
                   />
@@ -704,7 +920,12 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange }: Exe
                           className="inline-block w-3 h-3 mr-2" 
                           style={{ backgroundColor: colors[index % colors.length] }}
                         ></span>
-                        <span className="text-[#8C8C8C]">{formatMetricName(field)}</span>
+                        <span 
+                          className="text-[#8C8C8C]"
+                          title={`${formatMetricName(field)}`}
+                        >
+                          {formatMetricName(field)}
+                        </span>
                       </label>
                     </div>
                   );
@@ -732,9 +953,12 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange }: Exe
                       <th className="px-4 py-2 text-left font-medium text-[#8C8C8C]">Athlete</th>
                       <th className="px-4 py-2 text-left font-medium text-[#8C8C8C]">Variant</th>
                       {getUniqueMetricFields().map(field => (
-                        <th key={field} className="px-4 py-2 text-left font-medium text-[#8C8C8C]">
-                          {formatMetricName(field)}
-                        </th>
+                        // Only show table columns for visible metrics
+                        visibleMetrics[field] !== false && (
+                          <th key={field} className="px-4 py-2 text-left font-medium text-[#8C8C8C]">
+                            {formatMetricNameOnly(field)}
+                          </th>
+                        )
                       ))}
                     </tr>
                   </thead>
@@ -747,13 +971,60 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange }: Exe
                         <td className="px-4 py-3 text-white">{dataPoint.date || formatDateDisplay(dataPoint.rawDate)}</td>
                         <td className="px-4 py-3 text-[#8C8C8C]">{dataPoint.athleteName}</td>
                         <td className="px-4 py-3 text-[#8C8C8C]">{dataPoint.variant}</td>
-                        {getUniqueMetricFields().map(field => (
-                          <td key={field} className="px-4 py-3 text-[#8C8C8C]">
-                            {typeof dataPoint[field] === 'number' 
-                              ? dataPoint[field].toFixed(2) 
-                              : dataPoint[field] || 'N/A'}
-                          </td>
-                        ))}
+                        {getUniqueMetricFields().map(field => 
+                          // Only render cells for visible metrics
+                          visibleMetrics[field] !== false ? (
+                            <td key={field} className="px-4 py-3 text-[#8C8C8C]">
+                              {typeof dataPoint[field] === 'number' 
+                                ? (() => {
+                                    // Use proper scientific units based on measurement type
+                                    const metricFieldToUnit: Record<string, string> = {
+                                      // Force metrics - Newtons (N)
+                                      'meanForce': 'N',
+                                      'peakForce': 'N',
+                                      'relativeForce': 'N',
+                                      'relativeMeanForce': 'N',
+                                      'relativePeakForce': 'N',
+                                      'bestMeanForce': 'N',
+                                      
+                                      // Velocity metrics - meters per second (m/s)
+                                      'meanVelocity': 'm/s',
+                                      'peakVelocity': 'm/s',
+                                      'meanPropulsiveVelocity': 'm/s',
+                                      'eccentricMeanVelocity': 'm/s',
+                                      'eccentricPeakVelocity': 'm/s',
+                                      'bestMeanVelocity': 'm/s',
+                                      
+                                      // Power metrics - Watts (W)
+                                      'meanPower': 'W',
+                                      'peakPower': 'W',
+                                      'relativeMeanPower': 'W',
+                                      'relativePeakPower': 'W',
+                                      'bestMeanPower': 'W',
+                                      
+                                      // Acceleration metrics - meters per second squared (m/s²)
+                                      'meanAcceleration': 'm/s²',
+                                      'peakAcceleration': 'm/s²',
+                                      
+                                      // Impulse metrics - Newton seconds (N·s)
+                                      'meanConcentricImpulse': 'N·s',
+                                      
+                                      // Other common metrics
+                                      'estimatedOneRepMax': 'kg',
+                                      'weight': 'kg',
+                                      'timeUnderTension': 's',
+                                      'totalWork': 'J',
+                                      'repCount': 'reps'
+                                    };
+                                    
+                                    // Get the known unit for this field
+                                    const unit = metricFieldToUnit[field] || getShorthandUnit(getMetricUnit(field));
+                                    return `${dataPoint[field].toFixed(2)}${unit ? ' ' + unit : ''}`;
+                                  })()
+                                : dataPoint[field] || 'N/A'}
+                            </td>
+                          ) : null
+                        )}
                       </tr>
                     ))}
                   </tbody>
