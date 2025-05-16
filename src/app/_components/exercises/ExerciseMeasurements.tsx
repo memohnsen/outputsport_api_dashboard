@@ -773,9 +773,9 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange }: Exe
       // Force metrics - Newtons (N)
       'meanForce': 'N',
       'peakForce': 'N',
-      'relativeForce': 'N',
-      'relativeMeanForce': 'N',
-      'relativePeakForce': 'N',
+      'relativeForce': 'N/kg',
+      'relativeMeanForce': 'N/kg',
+      'relativePeakForce': 'N/kg',
       'bestMeanForce': 'N',
       
       // Velocity metrics - meters per second (m/s)
@@ -789,8 +789,8 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange }: Exe
       // Power metrics - Watts (W)
       'meanPower': 'W',
       'peakPower': 'W',
-      'relativeMeanPower': 'W',
-      'relativePeakPower': 'W',
+      'relativeMeanPower': 'W/kg',
+      'relativePeakPower': 'W/kg',
       'bestMeanPower': 'W',
       
       // Acceleration metrics - meters per second squared (m/s²)
@@ -1035,14 +1035,6 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange }: Exe
                         return value; // Already formatted as HH:MM in the data processing
                       }
                     }}
-                    label={{ 
-                      value: timeRange === 'today' ? 'Time' : 
-                            timeRange === '7days' ? 'Day' : 
-                            timeRange === '30days' ? 'Week' : 'Month', 
-                      position: 'insideBottomRight', 
-                      offset: -10,
-                      fill: '#8C8C8C'
-                    }}
                   />
                   <YAxis stroke="#8C8C8C" />
                   <Tooltip 
@@ -1062,9 +1054,9 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange }: Exe
                         // Force metrics - Newtons (N)
                         'meanForce': 'N',
                         'peakForce': 'N',
-                        'relativeForce': 'N',
-                        'relativeMeanForce': 'N',
-                        'relativePeakForce': 'N',
+                        'relativeForce': 'N/kg',
+                        'relativeMeanForce': 'N/kg',
+                        'relativePeakForce': 'N/kg',
                         'bestMeanForce': 'N',
                         
                         // Velocity metrics - meters per second (m/s)
@@ -1078,8 +1070,8 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange }: Exe
                         // Power metrics - Watts (W)
                         'meanPower': 'W',
                         'peakPower': 'W',
-                        'relativeMeanPower': 'W',
-                        'relativePeakPower': 'W',
+                        'relativeMeanPower': 'W/kg',
+                        'relativePeakPower': 'W/kg',
                         'bestMeanPower': 'W',
                         
                         // Acceleration metrics - meters per second squared (m/s²)
@@ -1139,21 +1131,23 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange }: Exe
                     }}
                   />
                   
-                  {getUniqueMetricFields().map((field, index) => {
-                    const colors = ['#887D2B', '#A19543', '#7A705F', '#BFAF30', '#D6C12B'];
-                    // Only render the Line if the metric is visible
-                    return visibleMetrics[field] !== false ? (
-                      <Line 
-                        key={field}
-                        type="monotone" 
-                        dataKey={field} 
-                        stroke={colors[index % colors.length]} 
-                        activeDot={{ r: 8 }} 
-                        name={formatMetricName(field)}
-                        connectNulls={true}
-                      />
-                    ) : null;
-                  })}
+                  {getUniqueMetricFields()
+                    .filter(field => visibleMetrics[field] !== false)
+                    .slice(0, 5) // Limit to first 5 selected metrics only
+                    .map((field, index) => {
+                      const colors = ['#887D2B', '#A19543', '#7A705F', '#BFAF30', '#D6C12B'];
+                      return (
+                        <Line 
+                          key={field}
+                          type="monotone" 
+                          dataKey={field} 
+                          stroke={colors[index % colors.length]} 
+                          activeDot={{ r: 8 }} 
+                          name={formatMetricName(field)}
+                          connectNulls={true}
+                        />
+                      );
+                    })}
                 </RechartsLineChart>
               </ResponsiveContainer>
             </div>
@@ -1227,7 +1221,6 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange }: Exe
                     <tr className="border-b border-[#8C8C8C]/30">
                       <th className="px-4 py-2 text-left font-medium text-[#8C8C8C]">Date</th>
                       <th className="px-4 py-2 text-left font-medium text-[#8C8C8C]">Athlete</th>
-                      <th className="px-4 py-2 text-left font-medium text-[#8C8C8C]">Variant</th>
                       {getUniqueMetricFields().map(field => (
                         // Only show table columns for visible metrics
                         visibleMetrics[field] !== false && (
@@ -1254,7 +1247,6 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange }: Exe
                           )}
                         </td>
                         <td className="px-4 py-3 text-[#8C8C8C]">{dataPoint.athleteName}</td>
-                        <td className="px-4 py-3 text-[#8C8C8C]">{dataPoint.variant}</td>
                         {getUniqueMetricFields().map(field => 
                           // Only render cells for visible metrics
                           visibleMetrics[field] !== false ? (
@@ -1266,9 +1258,9 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange }: Exe
                                       // Force metrics - Newtons (N)
                                       'meanForce': 'N',
                                       'peakForce': 'N',
-                                      'relativeForce': 'N',
-                                      'relativeMeanForce': 'N',
-                                      'relativePeakForce': 'N',
+                                      'relativeForce': 'N/kg',
+                                      'relativeMeanForce': 'N/kg',
+                                      'relativePeakForce': 'N/kg',
                                       'bestMeanForce': 'N',
                                       
                                       // Velocity metrics - meters per second (m/s)
@@ -1282,8 +1274,8 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange }: Exe
                                       // Power metrics - Watts (W)
                                       'meanPower': 'W',
                                       'peakPower': 'W',
-                                      'relativeMeanPower': 'W',
-                                      'relativePeakPower': 'W',
+                                      'relativeMeanPower': 'W/kg',
+                                      'relativePeakPower': 'W/kg',
                                       'bestMeanPower': 'W',
                                       
                                       // Acceleration metrics - meters per second squared (m/s²)
@@ -1327,6 +1319,13 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange }: Exe
           <p className="mt-2 text-sm text-[#8C8C8C]">
             The exercise exists in this time range but has no data points to display.
           </p>
+        </div>
+      )}
+      
+      {/* Add note about metric limit when needed */}
+      {getUniqueMetricFields().filter(field => visibleMetrics[field] !== false).length > 5 && (
+        <div className="text-xs text-[#8C8C8C] italic mt-2 text-center">
+          * Chart displays only the first 5 selected metrics. All selected metrics are shown in the table below.
         </div>
       )}
     </div>
