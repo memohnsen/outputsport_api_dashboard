@@ -24,14 +24,6 @@ export default async function Home() {
             </button>
           </header>
           
-          <div className="mb-8 border-b border-[#8C8C8C]/30">
-            <ul className="flex flex-wrap -mb-px text-sm font-medium text-center">
-              <li className="mr-2">
-                <a href="#" className="inline-block p-4 text-[#887D2B] border-b-2 border-[#887D2B] rounded-t-lg active">Output Sports API</a>
-              </li>
-            </ul>
-          </div>
-          
           <Suspense fallback={
             <div className="flex items-center justify-center py-16">
               <div className="h-10 w-10 animate-spin rounded-full border-b-2 border-t-2 border-[#887D2B]"></div>

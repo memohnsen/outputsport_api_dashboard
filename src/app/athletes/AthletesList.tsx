@@ -107,9 +107,7 @@ export default function AthletesList() {
 
   return (
     <div className="w-full">
-      <div className="mb-6 flex flex-wrap items-center justify-between">
-        <h2 className="text-2xl font-bold text-white">Athletes Directory</h2>
-        
+      <div className="mb-6 flex flex-wrap items-center justify-end">        
         <div className="flex items-center">
           <p className="mr-4 text-[#8C8C8C]">Sort by:</p>
           <div className="flex space-x-2">

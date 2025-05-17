@@ -10,7 +10,7 @@ export default function AthletesPage() {
         <div className="mx-auto max-w-7xl">
           <header className="mb-8 flex items-center justify-between">
             <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">
-              <span className="text-[#887D2B]">Output</span> Sports Analytics
+              <span className="text-[#887D2B]">Power & Grace</span> Performance Analytics
             </h1>
             <nav className="hidden space-x-8 md:flex">
               <Link href="/" className="text-[#8C8C8C] hover:text-white">Dashboard</Link>
@@ -22,14 +22,6 @@ export default function AthletesPage() {
               </svg>
             </button>
           </header>
-          
-          <div className="mb-8 border-b border-[#8C8C8C]/30">
-            <ul className="flex flex-wrap -mb-px text-sm font-medium text-center">
-              <li className="mr-2">
-                <a href="#" className="inline-block p-4 text-[#887D2B] border-b-2 border-[#887D2B] rounded-t-lg active">Athletes Directory</a>
-              </li>
-            </ul>
-          </div>
           
           <Suspense fallback={
             <div className="flex items-center justify-center py-16">

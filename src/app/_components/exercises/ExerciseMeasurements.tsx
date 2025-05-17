@@ -41,7 +41,7 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange }: Exe
     const endDateStr = formatDateString(now);
     let startDateStr;
     
-    // Calculate date ranges based on selected option
+    // Calculate date ranges based on selected option, always including today
     switch(timeRange) {
       case 'today':
         // Today's date - explicitly set both start and end date to today
@@ -50,39 +50,35 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange }: Exe
         console.log(`Today's range string: ${startDateStr} (for both start and end)`);
         break;
       case '7days':
-        // 7 days ago
-        const sevenDaysAgo = new Date();
-        sevenDaysAgo.setDate(now.getDate() - 7);
+        // 6 days before today for a total of 7 days
+        const sevenDaysAgo = new Date(now);
+        sevenDaysAgo.setDate(now.getDate() - 6);
         startDateStr = formatDateString(sevenDaysAgo);
+        console.log(`7 days range: ${startDateStr} to ${endDateStr} (includes today and 6 previous days)`);
         break;
       case '30days':
-        // 30 days ago
-        const thirtyDaysAgo = new Date();
-        thirtyDaysAgo.setDate(now.getDate() - 30);
+        // 29 days before today for a total of 30 days
+        const thirtyDaysAgo = new Date(now);
+        thirtyDaysAgo.setDate(now.getDate() - 29);
         startDateStr = formatDateString(thirtyDaysAgo);
         break;
       case '90days':
-        // 90 days - maximum recommended range based on API behavior
-        const ninetyDaysAgo = new Date();
-        ninetyDaysAgo.setDate(now.getDate() - 90);
+        // 89 days before today for a total of 90 days
+        const ninetyDaysAgo = new Date(now);
+        ninetyDaysAgo.setDate(now.getDate() - 89);
         startDateStr = formatDateString(ninetyDaysAgo);
         break;
       case 'year':
-        // Limit to 90 days for "year" option since API seems to reject larger ranges
-        const yearLimited = new Date();
-        yearLimited.setDate(now.getDate() - 90);
-        startDateStr = formatDateString(yearLimited);
-        break;
       case 'all':
-        // Also limit "all time" to 90 days based on API behavior in logs
-        const allTimeLimited = new Date();
-        allTimeLimited.setDate(now.getDate() - 90);
-        startDateStr = formatDateString(allTimeLimited);
+        // Also use 89 days for consistency with API limits
+        const limitedDate = new Date(now);
+        limitedDate.setDate(now.getDate() - 89);
+        startDateStr = formatDateString(limitedDate);
         break;
       default:
-        // Default to 30 days
-        const defaultDate = new Date();
-        defaultDate.setDate(now.getDate() - 30);
+        // Default to 30 days (including today)
+        const defaultDate = new Date(now);
+        defaultDate.setDate(now.getDate() - 29);
         startDateStr = formatDateString(defaultDate);
     }
     
@@ -199,21 +195,73 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange }: Exe
   const filterMeasurementsByTimeRange = (measurements: ExerciseMeasurement[], currentTimeRange: TimeRange) => {
     setLoading(true);
     
-    const { startDateStr, endDateStr } = getDateRange();
-    console.log(`Filtering measurements for time range: ${currentTimeRange} (${startDateStr} to ${endDateStr})`);
+    // Get today's date for consistent date handling
+    const today = new Date();
+    const todayYMD = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    
+    // Calculate start and end dates based on time range, explicitly ensuring today is included
+    let startDate = new Date(today); // Clone today
+    const endDate = new Date(today); // End date is always today
+    
+    // Set end time to end of day to include all of today's data
+    endDate.setHours(23, 59, 59, 999);
+    
+    // Calculate the start date based on the time range (moving backward from today)
+    switch (currentTimeRange) {
+      case 'today':
+        // Start date is beginning of today
+        startDate.setHours(0, 0, 0, 0);
+        break;
+      case '7days':
+        // 6 days before today (for a total of 7 days including today)
+        startDate.setDate(today.getDate() - 6);
+        startDate.setHours(0, 0, 0, 0);
+        break;
+      case '30days':
+        // 29 days before today (for a total of 30 days including today)
+        startDate.setDate(today.getDate() - 29);
+        startDate.setHours(0, 0, 0, 0);
+        break;
+      case '90days':
+        // 89 days before today (for a total of 90 days including today)
+        startDate.setDate(today.getDate() - 89);
+        startDate.setHours(0, 0, 0, 0);
+        break;
+      case 'year':
+      case 'all':
+        // Use 90 days for both year and all-time (based on API limits)
+        startDate.setDate(today.getDate() - 89);
+        startDate.setHours(0, 0, 0, 0);
+        break;
+      default:
+        // Default to 30 days
+        startDate.setDate(today.getDate() - 29);
+        startDate.setHours(0, 0, 0, 0);
+    }
+    
+    // Format dates for logging
+    const startDateStr = startDate.toISOString().split('T')[0];
+    const endDateStr = todayYMD;
+    
+    console.log(`Filtering measurements for time range: ${currentTimeRange}`);
+    console.log(`Date range: ${startDateStr} to ${endDateStr} (today)`);
+    console.log(`Using start timestamp: ${startDate.toISOString()}, end timestamp: ${endDate.toISOString()}`);
     
     try {
-      // For the "today" case, use a simpler string-based date comparison to avoid timezone issues
+      // For the "today" case, use a simpler string-based date comparison
       if (currentTimeRange === 'today') {
-        console.log(`TODAY CASE - Using direct date string comparison with ${startDateStr}`);
+        console.log(`TODAY CASE - Using direct date string comparison with ${todayYMD}`);
         
         // Filter directly using the date string for today's date
         const filteredByDate = measurements.filter(measurement => {
           // Extract just the date part from the measurement's completedDate
           const datePartOnly = measurement.completedDate.split('T')[0];
-          const isToday = datePartOnly === startDateStr; // Since startDateStr === endDateStr for "today"
+          const isToday = datePartOnly === todayYMD;
           
-          console.log(`Measurement date: ${measurement.completedDate}, extracted date: ${datePartOnly}, isToday: ${isToday}`);
+          if (isToday) {
+            console.log(`Found today's measurement: ${measurement.completedDate}`);
+          }
+          
           return isToday;
         });
         
@@ -250,27 +298,24 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange }: Exe
         return;
       }
       
-      // For other time ranges, use the existing date-based comparison logic
-      // Create fresh Date objects from our formatted date strings (in local time)
-      const startDate = new Date(startDateStr);
-      const endDate = new Date(endDateStr);
-      
-      // Set time to beginning of day (00:00:00) in local time
-      startDate.setHours(0, 0, 0, 0);
-      
-      // Set time to end of day (23:59:59.999) in local time
-      endDate.setHours(23, 59, 59, 999);
-      
-      // Log the actual date objects with times for debugging
-      console.log(`Date range for filtering - Start: ${startDate.toISOString()}, End: ${endDate.toISOString()}`);
+      // For other time ranges, use timestamp comparison
+      console.log(`Using time range: ${currentTimeRange}, filtering between ${startDate.toISOString()} and ${endDate.toISOString()}`);
       
       // Filter measurements by date range
       const filteredByDate = measurements.filter(measurement => {
         const measurementDate = new Date(measurement.completedDate);
-        return measurementDate >= startDate && measurementDate <= endDate;
+        const isInRange = measurementDate >= startDate && measurementDate <= endDate;
+        
+        // Debug logging for today's data to confirm inclusion
+        const measurementYMD = measurement.completedDate.split('T')[0];
+        if (measurementYMD === todayYMD) {
+          console.log(`Today's measurement: ${measurement.completedDate}, included: ${isInRange}`);
+        }
+        
+        return isInRange;
       });
       
-      console.log(`Filtered to ${filteredByDate.length} measurements for the selected time range`);
+      console.log(`Filtered to ${filteredByDate.length} measurements for ${currentTimeRange}`);
       
       // Update measurements state with filtered data
       setMeasurements(filteredByDate);
