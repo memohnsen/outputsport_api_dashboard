@@ -3,6 +3,7 @@ import Dashboard from "./_components/Dashboard";
 import OutputDashboard from "./_components/OutputDashboard";
 import { Suspense } from "react";
 import Link from "next/link";
+import { SignedIn, UserButton } from "@clerk/nextjs";
 
 export default async function Home() {
   return (
@@ -13,9 +14,14 @@ export default async function Home() {
             <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">
               <span className="text-[#887D2B]">Power & Grace</span> Performance Analytics
             </h1>
-            <nav className="hidden space-x-8 md:flex">
+            <nav className="hidden space-x-8 md:flex items-center">
               <Link href="/" className="text-white hover:text-[#887D2B]">Dashboard</Link>
               <Link href="/athletes" className="text-[#8C8C8C] hover:text-white">Athletes</Link>
+              <SignedIn>
+                <div className="ml-4">
+                  <UserButton afterSignOutUrl="/" />
+                </div>
+              </SignedIn>
             </nav>
             <button className="rounded-md bg-white/10 p-2 md:hidden">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
