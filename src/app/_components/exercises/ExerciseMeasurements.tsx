@@ -23,6 +23,8 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange }: Exe
   const [selectedExercise, setSelectedExercise] = useState<string | null>(null);
   const [chartData, setChartData] = useState<any[]>([]);
   const [visibleMetrics, setVisibleMetrics] = useState<Record<string, boolean>>({});
+  const [secondaryAxisMetrics, setSecondaryAxisMetrics] = useState<string[]>([]);
+  const [primaryAxisMetrics, setPrimaryAxisMetrics] = useState<string[]>([]);
 
   // Get date range based on selected time range
   const getDateRange = () => {
@@ -691,6 +693,79 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange }: Exe
         console.log(`Sample value for ${field}: ${sampleDataPoint[field]}`);
       });
     }
+
+    // After processing the data, identify which metrics need a secondary axis
+    if (processedData.length > 0) {
+      // Get all the metrics from the data
+      const allMetrics = getUniqueMetricFields(processedData);
+      
+      // Calculate the max value for each metric
+      const metricMaxValues: Record<string, number> = {};
+      allMetrics.forEach(metric => {
+        const values = processedData.map(item => item[metric]).filter(v => typeof v === 'number') as number[];
+        if (values.length > 0) {
+          metricMaxValues[metric] = Math.max(...values);
+        }
+      });
+      
+      // Group metrics by order of magnitude
+      const metricsByMagnitude: Record<string, number[]> = {};
+      Object.entries(metricMaxValues).forEach(([metric, maxValue]) => {
+        if (maxValue === 0) return; // Skip metrics with max value of 0
+        
+        // Get order of magnitude (10^x where maxValue is between 10^x and 10^(x+1))
+        const magnitude = Math.floor(Math.log10(maxValue));
+        if (!metricsByMagnitude[magnitude]) {
+          metricsByMagnitude[magnitude] = [];
+        }
+        metricsByMagnitude[magnitude].push(parseInt(metric));
+      });
+      
+      console.log('Metrics grouped by magnitude:', metricsByMagnitude);
+      
+      // Find the most common magnitude group
+      let primaryMagnitude = '';
+      let maxMetrics = 0;
+      
+      Object.entries(metricsByMagnitude).forEach(([magnitude, metrics]) => {
+        if (metrics.length > maxMetrics) {
+          maxMetrics = metrics.length;
+          primaryMagnitude = magnitude;
+        }
+      });
+      
+      // All metrics not in the primary magnitude group will use the secondary axis
+      const primary: string[] = [];
+      const secondary: string[] = [];
+      
+      allMetrics.forEach(metric => {
+        // Get the max value for this metric
+        const maxVal = metricMaxValues[metric] || 0;
+        if (maxVal === 0) {
+          primary.push(metric); // Default to primary if no data
+          return;
+        }
+        
+        // Calculate the magnitude of this metric's max value
+        const magnitude = Math.floor(Math.log10(maxVal));
+        
+        // If the magnitude differs by more than 1 from the primary magnitude,
+        // put it on the secondary axis
+        if (Math.abs(magnitude - parseInt(primaryMagnitude)) > 1) {
+          secondary.push(metric);
+          console.log(`Metric ${metric} (max ${maxVal}) assigned to secondary axis (magnitude: ${magnitude})`);
+        } else {
+          primary.push(metric);
+          console.log(`Metric ${metric} (max ${maxVal}) assigned to primary axis (magnitude: ${magnitude})`);
+        }
+      });
+      
+      setPrimaryAxisMetrics(primary);
+      setSecondaryAxisMetrics(secondary);
+      
+      console.log('Primary axis metrics:', primary);
+      console.log('Secondary axis metrics:', secondary);
+    }
   }, [selectedExercise, measurements, timeRange]);
 
   // Update the time range text in the subtitle
@@ -1062,9 +1137,9 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange }: Exe
                   data={chartData}
                   margin={{
                     top: 10,
-                    right: 20,
+                    right: 40, // Increased to make room for secondary Y-axis
                     left: 20,
-                    bottom: 10,
+                    bottom: 30,
                   }}
                 >
                   <CartesianGrid strokeDasharray="3 3" stroke="#333" />
@@ -1081,7 +1156,22 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange }: Exe
                       }
                     }}
                   />
-                  <YAxis stroke="#8C8C8C" />
+                  
+                  {/* Primary Y-axis */}
+                  <YAxis 
+                    yAxisId="left"
+                    stroke="#8C8C8C"
+                    domain={['auto', 'auto']}
+                  />
+                  
+                  {/* Secondary Y-axis */}
+                  <YAxis 
+                    yAxisId="right"
+                    orientation="right"
+                    stroke="#A19543"
+                    domain={['auto', 'auto']}
+                  />
+                  
                   <Tooltip 
                     contentStyle={{ 
                       backgroundColor: 'rgba(40, 40, 40, 0.95)',
@@ -1176,11 +1266,17 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange }: Exe
                     }}
                   />
                   
+                  {/* Render lines based on which axis they belong to */}
                   {getUniqueMetricFields()
                     .filter(field => visibleMetrics[field] !== false)
                     .slice(0, 5) // Limit to first 5 selected metrics only
                     .map((field, index) => {
                       const colors = ['#887D2B', '#A19543', '#7A705F', '#BFAF30', '#D6C12B'];
+                      
+                      // Determine which Y axis to use
+                      const isSecondary = secondaryAxisMetrics.includes(field);
+                      const yAxisId = isSecondary ? "right" : "left";
+                      
                       return (
                         <Line 
                           key={field}
@@ -1190,9 +1286,12 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange }: Exe
                           activeDot={{ r: 8 }} 
                           name={formatMetricName(field)}
                           connectNulls={true}
+                          yAxisId={yAxisId}
+                          strokeWidth={isSecondary ? 2 : 2} // Same width for consistency
                         />
                       );
-                    })}
+                    })
+                  }
                 </RechartsLineChart>
               </ResponsiveContainer>
             </div>
@@ -1371,6 +1470,17 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange }: Exe
       {getUniqueMetricFields().filter(field => visibleMetrics[field] !== false).length > 5 && (
         <div className="text-xs text-[#8C8C8C] italic mt-2 text-center">
           * Chart displays only the first 5 selected metrics. All selected metrics are shown in the table below.
+        </div>
+      )}
+
+      {/* Show explanation text if there are metrics on both axes */}
+      {secondaryAxisMetrics.length > 0 && (
+        <div className="text-xs text-[#8C8C8C] mt-1 flex items-center">
+          <span className="inline-block w-3 h-3 mr-1 bg-[#8C8C8C]"></span>
+          <span>Primary Y-axis (left)</span>
+          <span className="mx-2">•</span>
+          <span className="inline-block w-3 h-3 mr-1 bg-[#A19543]"></span>
+          <span>Secondary Y-axis (right)</span>
         </div>
       )}
     </div>
