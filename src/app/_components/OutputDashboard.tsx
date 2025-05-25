@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import ExerciseMeasurements from './exercises/ExerciseMeasurements';
 import MetricsOverview from './MetricsOverview';
+import AIAnalysis from './AIAnalysis';
 import type { Athlete } from '@/services/outputSports.client';
 import { getAthletes } from '@/services/outputSports.client';
 import { useSearchParams } from 'next/navigation';
@@ -15,6 +16,7 @@ export default function OutputDashboard() {
   const [isLoadingAthlete, setIsLoadingAthlete] = useState(false);
   const [isLoadingAthletes, setIsLoadingAthletes] = useState(true);
   const [timeRange, setTimeRange] = useState<TimeRange>('7days');
+  const [selectedExercise, setSelectedExercise] = useState<string | null>(null);
   const searchParams = useSearchParams();
   
   // Fetch all athletes on component mount
@@ -123,6 +125,8 @@ export default function OutputDashboard() {
       
       <MetricsOverview />
       
+      <AIAnalysis selectedAthlete={selectedAthlete} timeRange={timeRange} selectedExercise={selectedExercise} />
+      
       <div className="grid grid-cols-1">
         {isLoadingAthlete ? (
           <div className="flex h-64 items-center justify-center rounded-xl bg-[#1a1a1a] p-6 backdrop-blur-sm border border-[#8C8C8C]/10">
@@ -130,7 +134,12 @@ export default function OutputDashboard() {
             <span className="ml-2 text-white">Loading athlete data...</span>
           </div>
         ) : (
-          <ExerciseMeasurements selectedAthlete={selectedAthlete} timeRange={timeRange} />
+          <ExerciseMeasurements 
+            selectedAthlete={selectedAthlete} 
+            timeRange={timeRange}
+            selectedExercise={selectedExercise}
+            onExerciseChange={setSelectedExercise}
+          />
         )}
       </div>
     </div>

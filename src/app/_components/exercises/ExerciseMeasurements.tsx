@@ -10,9 +10,11 @@ type TimeRange = 'today' | '7days' | '30days' | '90days' | 'year' | 'all';
 interface ExerciseMeasurementsProps {
   selectedAthlete: Athlete | null;
   timeRange: TimeRange;
+  selectedExercise?: string | null;
+  onExerciseChange?: (exerciseId: string | null) => void;
 }
 
-export default function ExerciseMeasurements({ selectedAthlete, timeRange }: ExerciseMeasurementsProps) {
+export default function ExerciseMeasurements({ selectedAthlete, timeRange, selectedExercise: propSelectedExercise, onExerciseChange }: ExerciseMeasurementsProps) {
   const [measurements, setMeasurements] = useState<ExerciseMeasurement[]>([]);
   const [allMeasurements, setAllMeasurements] = useState<ExerciseMeasurement[]>([]);
   const [exercises, setExercises] = useState<ExerciseMetadata[]>([]);
@@ -192,6 +194,13 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange }: Exe
     
     fetchInitialData();
   }, [selectedAthlete]); // Only re-fetch all data when athlete changes
+
+  // Sync internal selectedExercise state with prop
+  useEffect(() => {
+    if (propSelectedExercise !== undefined && propSelectedExercise !== selectedExercise) {
+      setSelectedExercise(propSelectedExercise);
+    }
+  }, [propSelectedExercise]);
   
   // Function to filter measurements by time range
   const filterMeasurementsByTimeRange = (measurements: ExerciseMeasurement[], currentTimeRange: TimeRange) => {
@@ -287,12 +296,23 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange }: Exe
         if (selectedExercise && !exerciseIdsWithData.has(selectedExercise)) {
           if (availableExercises.length > 0 && availableExercises[0]?.id) {
             console.log(`Selected exercise ${selectedExercise} has no data in this range, switching to ${availableExercises[0].id}`);
-            setSelectedExercise(availableExercises[0].id);
+            const newExerciseId = availableExercises[0].id;
+            setSelectedExercise(newExerciseId);
+            if (onExerciseChange) {
+              onExerciseChange(newExerciseId);
+            }
           } else {
             setSelectedExercise(null);
+            if (onExerciseChange) {
+              onExerciseChange(null);
+            }
           }
         } else if (!selectedExercise && availableExercises.length > 0 && availableExercises[0]?.id) {
-          setSelectedExercise(availableExercises[0].id);
+          const newExerciseId = availableExercises[0].id;
+          setSelectedExercise(newExerciseId);
+          if (onExerciseChange) {
+            onExerciseChange(newExerciseId);
+          }
         }
         
         setError(null);
@@ -337,12 +357,23 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange }: Exe
       if (selectedExercise && !exerciseIdsWithData.has(selectedExercise)) {
         if (availableExercises.length > 0 && availableExercises[0]?.id) {
           console.log(`Selected exercise ${selectedExercise} has no data in this range, switching to ${availableExercises[0].id}`);
-          setSelectedExercise(availableExercises[0].id);
+          const newExerciseId = availableExercises[0].id;
+          setSelectedExercise(newExerciseId);
+          if (onExerciseChange) {
+            onExerciseChange(newExerciseId);
+          }
         } else {
           setSelectedExercise(null);
+          if (onExerciseChange) {
+            onExerciseChange(null);
+          }
         }
       } else if (!selectedExercise && availableExercises.length > 0 && availableExercises[0]?.id) {
-        setSelectedExercise(availableExercises[0].id);
+        const newExerciseId = availableExercises[0].id;
+        setSelectedExercise(newExerciseId);
+        if (onExerciseChange) {
+          onExerciseChange(newExerciseId);
+        }
       }
       
       setError(null);
@@ -857,7 +888,13 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange }: Exe
   const handleExerciseChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const exerciseId = e.target.value;
     console.log(`Changing selected exercise to: ${exerciseId}`);
-    setSelectedExercise(exerciseId);
+    const exerciseValue = exerciseId || null;
+    setSelectedExercise(exerciseValue);
+    
+    // Notify parent component of the exercise change
+    if (onExerciseChange) {
+      onExerciseChange(exerciseValue);
+    }
   };
 
   // Get the unit of measure for a specific metric field
@@ -1271,7 +1308,8 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange }: Exe
                     .filter(field => visibleMetrics[field] !== false)
                     .slice(0, 5) // Limit to first 5 selected metrics only
                     .map((field, index) => {
-                      const colors = ['#887D2B', '#A19543', '#7A705F', '#BFAF30', '#D6C12B'];
+                      // Use highly distinct colors for better visibility
+                      const colors = ['#FF0000', '#00FF00', '#0080FF', '#FF8000', '#FF00FF', '#00FFFF', '#FFFF00', '#FF4080', '#80FF00', '#8000FF'];
                       
                       // Determine which Y axis to use
                       const isSecondary = secondaryAxisMetrics.includes(field);
@@ -1287,7 +1325,7 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange }: Exe
                           name={formatMetricName(field)}
                           connectNulls={true}
                           yAxisId={yAxisId}
-                          strokeWidth={isSecondary ? 2 : 2} // Same width for consistency
+                          strokeWidth={3} // Thicker lines for better visibility
                         />
                       );
                     })
@@ -1316,7 +1354,8 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange }: Exe
               </div>
               <div className="flex flex-col space-y-2 max-h-80 overflow-y-auto">
                 {getUniqueMetricFields().map((field, index) => {
-                  const colors = ['#887D2B', '#A19543', '#7A705F', '#BFAF30', '#D6C12B'];
+                  // Use the same highly distinct colors as the chart
+                  const colors = ['#FF0000', '#00FF00', '#0080FF', '#FF8000', '#FF00FF', '#00FFFF', '#FFFF00', '#FF4080', '#80FF00', '#8000FF'];
                   return (
                     <div key={field} className="flex items-center">
                       <input
@@ -1331,7 +1370,7 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange }: Exe
                         className="flex items-center text-sm cursor-pointer"
                       >
                         <span 
-                          className="inline-block w-3 h-3 mr-2" 
+                          className="inline-block w-3 h-3 mr-2 border border-white/20" 
                           style={{ backgroundColor: colors[index % colors.length] }}
                         ></span>
                         <span 
