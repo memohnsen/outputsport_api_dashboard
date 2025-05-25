@@ -711,8 +711,8 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange, aggre
             return match ? parseInt(match[1]) : 0;
           };
           
-          const weekA = getWeekNumber(a.groupKey as string);
-          const weekB = getWeekNumber(b.groupKey as string);
+          const weekA = getWeekNumber(a.groupKey);
+          const weekB = getWeekNumber(b.groupKey);
           
           // First sort by year, then by week
           const yearA = parseInt((a.groupKey || '').split('-')[0] || '0');
@@ -728,8 +728,12 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange, aggre
         // Sort by month for 90 days and all time
         processedData.sort((a, b) => {
           // Extract year and month from groupKey (YYYY-MM)
-          const [yearA, monthA] = a.groupKey.split('-').map((num: string) => parseInt(num));
-          const [yearB, monthB] = b.groupKey.split('-').map((num: string) => parseInt(num));
+          const splitA = (a.groupKey || '0-0').split('-');
+          const splitB = (b.groupKey || '0-0').split('-');
+          const yearA = parseInt(splitA[0] || '0');
+          const monthA = parseInt(splitA[1] || '0');
+          const yearB = parseInt(splitB[0] || '0');
+          const monthB = parseInt(splitB[1] || '0');
           
           // First compare years
           if (yearA !== yearB) {
@@ -1413,12 +1417,33 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange, aggre
                 {getUniqueMetricFields().map((field, index) => {
                   // Use the same highly distinct colors as the chart
                   const colors = ['#FF0000', '#00FF00', '#0080FF', '#FF8000', '#FF00FF', '#00FFFF', '#FFFF00', '#FF4080', '#80FF00', '#8000FF'];
+                  
+                  // Get the correct color based on the field's position in the visible metrics list
+                  // This ensures legend colors match chart line colors exactly
+                  const getFieldColor = (fieldName: string) => {
+                    const visibleFields = getUniqueMetricFields()
+                      .filter(f => visibleMetrics[f] !== false)
+                      .slice(0, 5); // Match the chart's limit of 5 visible metrics
+                    
+                    const visibleIndex = visibleFields.indexOf(fieldName);
+                    
+                    if (visibleIndex === -1) {
+                      // Field is not visible in chart, use a dimmed gray color
+                      return '#666666';
+                    }
+                    
+                    return colors[visibleIndex % colors.length];
+                  };
+                  
+                  const fieldColor = getFieldColor(field);
+                  const isVisible = visibleMetrics[field] !== false;
+                  
                   return (
                     <div key={field} className="flex items-center">
                       <input
                         type="checkbox"
                         id={`metric-${field}`}
-                        checked={visibleMetrics[field] !== false}
+                        checked={isVisible}
                         onChange={() => toggleMetricVisibility(field)}
                         className="mr-2 h-4 w-4 rounded border-[#8C8C8C]/30 bg-[#1a1a1a] focus:ring-[#887D2B]"
                       />
@@ -1428,7 +1453,7 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange, aggre
                       >
                         <span 
                           className="inline-block w-3 h-3 mr-2 border border-white/20" 
-                          style={{ backgroundColor: colors[index % colors.length] }}
+                          style={{ backgroundColor: fieldColor }}
                         ></span>
                         <span 
                           className="text-[#8C8C8C]"
