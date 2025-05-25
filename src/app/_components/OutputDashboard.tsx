@@ -9,6 +9,7 @@ import { getAthletes } from '@/services/outputSports.client';
 import { useSearchParams } from 'next/navigation';
 
 type TimeRange = 'today' | '7days' | '30days' | '90days' | 'year' | 'all';
+type AggregationMode = 'aggregate' | 'showAll';
 
 export default function OutputDashboard() {
   const [selectedAthlete, setSelectedAthlete] = useState<Athlete | null>(null);
@@ -16,6 +17,7 @@ export default function OutputDashboard() {
   const [isLoadingAthlete, setIsLoadingAthlete] = useState(false);
   const [isLoadingAthletes, setIsLoadingAthletes] = useState(true);
   const [timeRange, setTimeRange] = useState<TimeRange>('7days');
+  const [aggregationMode, setAggregationMode] = useState<AggregationMode>('aggregate');
   const [selectedExercise, setSelectedExercise] = useState<string | null>(null);
   const searchParams = useSearchParams();
   
@@ -69,6 +71,10 @@ export default function OutputDashboard() {
     setTimeRange(event.target.value as TimeRange);
   };
 
+  const handleAggregationModeChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    setAggregationMode(event.target.value as AggregationMode);
+  };
+
   const getTimeRangeLabel = () => {
     switch(timeRange) {
       case 'today': return 'Today';
@@ -106,7 +112,7 @@ export default function OutputDashboard() {
               </select>
             </div>
           </div>
-          <div className="mt-4 sm:mt-0">
+          <div className="mt-4 sm:mt-0 flex gap-2">
             <select
               className="w-full rounded-md border-[#8C8C8C]/20 bg-[#1a1a1a] px-3 py-2 text-white focus:border-[#887D2B] focus:ring focus:ring-[#887D2B]/30"
               value={timeRange}
@@ -118,6 +124,14 @@ export default function OutputDashboard() {
               <option value="90days">Last 90 Days</option>
               <option value="year">Last Year</option>
               <option value="all">All Time</option>
+            </select>
+            <select
+              className="w-full rounded-md border-[#8C8C8C]/20 bg-[#1a1a1a] px-3 py-2 text-white focus:border-[#887D2B] focus:ring focus:ring-[#887D2B]/30"
+              value={aggregationMode}
+              onChange={handleAggregationModeChange}
+            >
+              <option value="aggregate">Aggregate</option>
+              <option value="showAll">Show All</option>
             </select>
           </div>
         </div>
@@ -137,6 +151,7 @@ export default function OutputDashboard() {
           <ExerciseMeasurements 
             selectedAthlete={selectedAthlete} 
             timeRange={timeRange}
+            aggregationMode={aggregationMode}
             selectedExercise={selectedExercise}
             onExerciseChange={setSelectedExercise}
           />

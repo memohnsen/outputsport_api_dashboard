@@ -6,15 +6,17 @@ import type { ExerciseMetadata, ExerciseMeasurement, Athlete } from '@/services/
 import { LineChart as RechartsLineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 type TimeRange = 'today' | '7days' | '30days' | '90days' | 'year' | 'all';
+type AggregationMode = 'aggregate' | 'showAll';
 
 interface ExerciseMeasurementsProps {
   selectedAthlete: Athlete | null;
   timeRange: TimeRange;
+  aggregationMode: AggregationMode;
   selectedExercise?: string | null;
   onExerciseChange?: (exerciseId: string | null) => void;
 }
 
-export default function ExerciseMeasurements({ selectedAthlete, timeRange, selectedExercise: propSelectedExercise, onExerciseChange }: ExerciseMeasurementsProps) {
+export default function ExerciseMeasurements({ selectedAthlete, timeRange, aggregationMode, selectedExercise: propSelectedExercise, onExerciseChange }: ExerciseMeasurementsProps) {
   const [measurements, setMeasurements] = useState<ExerciseMeasurement[]>([]);
   const [allMeasurements, setAllMeasurements] = useState<ExerciseMeasurement[]>([]);
   const [exercises, setExercises] = useState<ExerciseMetadata[]>([]);
@@ -417,15 +419,17 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange, selec
 
   // Update chart data when selected exercise changes or measurements are loaded
   useEffect(() => {
-    if (!selectedExercise || measurements.length === 0) {
-      // Clear chart data if there are no measurements but preserve selected exercise
+    if (measurements.length === 0) {
+      // Clear chart data if there are no measurements
       setChartData([]);
       return;
     }
     
-    // Filter measurements for the selected exercise
-    const exerciseMeasurements = measurements.filter(m => m.exerciseId === selectedExercise);
-    console.log(`Filtered to ${exerciseMeasurements.length} measurements for exercise ${selectedExercise}`);
+    // Filter measurements for the selected exercise (or all if none selected)
+    const exerciseMeasurements = selectedExercise 
+      ? measurements.filter(m => m.exerciseId === selectedExercise)
+      : measurements; // Show all measurements if no specific exercise selected
+    console.log(`Filtered to ${exerciseMeasurements.length} measurements for ${selectedExercise ? `exercise ${selectedExercise}` : 'all exercises'}`);
     
     if (exerciseMeasurements.length === 0) {
       // No measurements for this exercise in the selected time range
@@ -433,23 +437,75 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange, selec
       return;
     }
     
-    // Debug: Log all unique units for the selected exercise
-    const exercise = exercises.find(e => e.id === selectedExercise);
-    if (exercise) {
-      console.log('DEBUG - All metrics and units for current exercise:');
-      exercise.metrics.forEach(metric => {
-        console.log(`${metric.field}: "${metric.unitOfMeasure}"`);
-      });
+    // Debug: Log all unique units for the selected exercise (or all exercises)
+    if (selectedExercise) {
+      const exercise = exercises.find(e => e.id === selectedExercise);
+      if (exercise) {
+        console.log('DEBUG - All metrics and units for current exercise:');
+        exercise.metrics.forEach(metric => {
+          console.log(`${metric.field}: "${metric.unitOfMeasure}"`);
+        });
+      }
+    } else {
+      console.log('DEBUG - Showing data for all movements combined');
     }
     
     // Process data for the chart, with time-based aggregation based on time range
     let processedData;
     
     // Log the type of data we're working with
-    console.log(`Processing ${exerciseMeasurements.length} measurements for ${timeRange} view`);
+    console.log(`Processing ${exerciseMeasurements.length} measurements for ${timeRange} view (${aggregationMode} mode)`);
     console.log(`First measurement sample:`, exerciseMeasurements[0]);
 
-    if (timeRange === 'today') {
+    if (aggregationMode === 'showAll') {
+      // For "Show All" mode, display individual measurements regardless of time range
+      processedData = exerciseMeasurements.map(measurement => {
+        // Ensure we have proper date handling
+        let formattedDate = '';
+        let formattedFullDate = new Date();
+        
+        try {
+          const date = new Date(measurement.completedDate);
+          if (!isNaN(date.getTime())) {
+            // Format date and time for individual measurements
+            const month = date.getMonth() + 1;
+            const day = date.getDate();
+            const hours = date.getHours();
+            const minutes = date.getMinutes();
+            formattedDate = `${month}/${day} ${hours}:${minutes < 10 ? '0' + minutes : minutes}`;
+            formattedFullDate = date;
+          } else {
+            console.error('Invalid date in measurement:', measurement.completedDate);
+          }
+        } catch (error) {
+          console.error('Error processing date:', error);
+        }
+        
+        // Create a base object with the date and athlete info
+        const dataPoint: any = {
+          id: measurement.id,
+          date: formattedDate,
+          fullDate: formattedFullDate,
+          rawDate: measurement.completedDate,
+          athleteId: measurement.athleteId,
+          athleteName: `${measurement.athleteFirstName} ${measurement.athleteLastName}`,
+          exerciseId: measurement.exerciseId,
+          exerciseCategory: measurement.exerciseCategory,
+          exerciseType: measurement.exerciseType,
+          variant: measurement.variant || 'Standard'
+        };
+        
+        // Add all metrics to the data point with proper field names and round to 2 decimal places
+        measurement.metrics.forEach(metric => {
+          dataPoint[metric.field] = Number(metric.value.toFixed(2));
+        });
+        
+        return dataPoint;
+      });
+      
+      // Sort by time for show all view
+      processedData.sort((a, b) => a.fullDate.getTime() - b.fullDate.getTime());
+    } else if (timeRange === 'today') {
       // For today view, display individual sets/measurements
       processedData = exerciseMeasurements.map(measurement => {
         // Ensure we have proper date handling
@@ -797,7 +853,7 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange, selec
       console.log('Primary axis metrics:', primary);
       console.log('Secondary axis metrics:', secondary);
     }
-  }, [selectedExercise, measurements, timeRange]);
+  }, [selectedExercise, measurements, timeRange, aggregationMode]);
 
   // Update the time range text in the subtitle
   const getTimeRangeText = () => {
@@ -879,7 +935,7 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange, selec
 
   // Get current exercise name and details
   const getCurrentExerciseName = () => {
-    if (!selectedExercise) return 'No exercise selected';
+    if (!selectedExercise) return 'All Movements';
     const exercise = exercises.find(e => e.id === selectedExercise);
     return exercise ? `${exercise.name} (${exercise.category})` : 'Unknown exercise';
   };
@@ -1133,6 +1189,7 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange, selec
             value={selectedExercise || ''}
             onChange={handleExerciseChange}
           >
+            <option value="">All Movements</option>
             {filteredExercises.map(exercise => (
               <option key={exercise.id} value={exercise.id}>
                 {exercise.name} ({exercise.category})
