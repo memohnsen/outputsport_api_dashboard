@@ -81,7 +81,8 @@ export async function POST(request: NextRequest) {
         {
           role: "system",
           content: `You are an expert data analyst specializing in Olympic weightlifting performance analytics. 
-                    Your expertise lies in extracting meaningful insights from complex training and competition datasets to drive evidence-based decisions.
+                    Your expertise lies in extracting meaningful insights from complex training and competition 
+                    datasets to drive evidence-based decisions.
 
                     ANALYTICAL FRAMEWORK:
 
@@ -123,22 +124,34 @@ export async function POST(request: NextRequest) {
                     - Support all recommendations with quantitative evidence and statistical backing
 
                     Always approach analysis with scientific rigor, acknowledging limitations in the data 
-                    and providing context for the confidence level of your insights. Provide your responses in plain text.`
+                    and providing context for the confidence level of your insights.
+                    
+                    RESPONSE FRAMEWORK:
+
+                    Data in the same day should be referred to as sets, data on different days should be referred to as sessions.
+                    
+                    12/31/1969 (55 years old) is the default birthday in the system, if no date of birth is provided. If this is the 
+                    date of birth for the user, do not include age in your analysis.
+                    
+                    Your recommendations should be specific and actionable, and should be based on the data provided.
+                    Do not make recommendations that are not supported by the data. If there is not enough data to make a recommendation,
+                    do not make a recommendation.
+                    
+                    Format your response in clear sections with headings in plain text. Do not use markdown.`
         },
         {
           role: "user",
           content: `Please analyze the following athlete performance data and provide insights:
 
-${analysisData}
+                    ${analysisData}
 
-Please provide:
-1. Key performance insights
-2. Trends observed in the data
-3. Areas for improvement
-4. Strengths identified
-5. Specific recommendations
-
-Format your response in clear sections with headings.`
+                    Please provide:
+                    1. Key performance insights
+                    2. Trends observed in the data
+                    3. Areas for improvement
+                    4. Strengths identified
+                    5. Specific recommendations
+                    6. Summary of the analysis`
         }
       ],
       max_tokens: 1500,
