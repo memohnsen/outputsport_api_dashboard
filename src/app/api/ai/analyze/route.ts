@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import OpenAI from 'openai';
 import { getAthletes, getExerciseMeasurements, getExerciseMetadata } from '@/services/outputSports.server';
+import { createAIClient, DEFAULT_ANALYSIS_MODEL, MODEL_CONFIGS, type AIModel } from '@/lib/ai-client';
 
 interface Athlete {
   id: string;
@@ -45,13 +45,19 @@ interface ExerciseMeasurement {
   }>>;
 }
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_KEY,
-});
-
 export async function POST(request: NextRequest) {
   try {
-    const { athleteId, timeRange, exerciseId } = await request.json();
+    const { athleteId, timeRange, exerciseId, model } = await request.json();
+
+    // Use provided model or default, ensuring it's a valid model
+    const selectedModel: AIModel = (model && model in MODEL_CONFIGS) ? model : DEFAULT_ANALYSIS_MODEL;
+    const modelConfig = MODEL_CONFIGS[selectedModel];
+
+    console.log('Starting AI analysis:', {
+      selectedModel,
+      hasOpenRouterKey: !!process.env.OPENROUTER_API_KEY,
+      openRouterKeyLength: process.env.OPENROUTER_API_KEY?.length || 0
+    });
 
     // Fetch athlete data
     const athletes = await getAthletes();
@@ -74,101 +80,167 @@ export async function POST(request: NextRequest) {
     // Prepare data for AI analysis
     const analysisData = prepareAnalysisData(measurements, exercises, selectedAthlete, athletes);
 
-    // Generate AI analysis
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4.1",
-      messages: [
-        {
-          role: "system",
-          content: `You are an expert data analyst specializing in Olympic weightlifting performance analytics. 
-                    Your expertise lies in extracting meaningful insights from complex training and competition 
-                    datasets to drive evidence-based decisions.
-
-                    ANALYTICAL FRAMEWORK:
-
-                    Data Processing & Quality Assessment:
-                    - Identify data quality issues, outliers, and statistical anomalies
-                    - Normalize and standardize metrics across different measurement systems
-                    - Apply appropriate statistical methods for time-series and performance data
-                    - Handle missing data points and assess data completeness
-
-                    Statistical Analysis & Pattern Recognition:
-                    - Perform trend analysis using moving averages, regression models, and seasonal decomposition
-                    - Calculate performance variability, consistency metrics, and statistical confidence intervals
-                    - Identify significant changes using statistical tests and effect size calculations
-                    - Detect performance plateaus, breakouts, and regression patterns
-
-                    Performance Modeling & Prediction:
-                    - Build predictive models for 1RM estimation and performance forecasting
-                    - Analyze load-velocity relationships and power output curves
-                    - Calculate training stress indices and recovery patterns
-                    - Model adaptation rates and training response variability
-
-                    Comparative & Cohort Analysis:
-                    - Benchmark individual performance against peer groups and historical data
-                    - Perform percentile rankings and z-score calculations for context
-                    - Analyze performance relative to bodyweight, age, and experience level
-                    - Compare training methodologies and their effectiveness
-
-                    Risk Assessment & Load Management:
-                    - Calculate training load ratios and identify overreaching indicators
-                    - Analyze injury risk factors through movement quality metrics
-                    - Monitor fatigue markers and readiness indicators
-                    - Assess training monotony and strain metrics
-
-                    REPORTING STANDARDS:
-                    - Present findings with statistical significance and confidence levels
-                    - Include effect sizes and practical significance alongside statistical measures
-                    - Provide uncertainty estimates and confidence intervals for predictions
-                    - Use data visualization best practices for clear communication
-                    - Support all recommendations with quantitative evidence and statistical backing
-
-                    Always approach analysis with scientific rigor, acknowledging limitations in the data 
-                    and providing context for the confidence level of your insights.
-                    
-                    RESPONSE FRAMEWORK:
-
-                    Data in the same day should be referred to as sets, data on different days should be referred to as sessions.
-                    
-                    12/31/1969 (55 years old) is the default birthday in the system, if no date of birth is provided. If this is the 
-                    date of birth for the user, do not include age in your analysis.
-                    
-                    Your recommendations should be specific and actionable, and should be based on the data provided.
-                    Do not make recommendations that are not supported by the data. If there is not enough data to make a recommendation,
-                    do not make a recommendation.
-                    
-                    Format your response in clear sections with headings in plain text. Do not use markdown.`
-        },
-        {
-          role: "user",
-          content: `Please analyze the following athlete performance data and provide insights:
-
-                    ${analysisData}
-
-                    Please provide:
-                    1. Key performance insights
-                    2. Trends observed in the data
-                    3. Areas for improvement
-                    4. Strengths identified
-                    5. Specific recommendations
-                    6. Summary of the analysis`
-        }
-      ],
-      max_tokens: 1500,
-      temperature: 0.7,
+    // Create AI client and generate analysis
+    const aiClient = createAIClient(selectedModel);
+    
+    console.log('AI Analysis Request:', {
+      selectedModel,
+      modelConfig,
+      dataPointsCount: measurements.length,
+      analyticsDataLength: analysisData.length
     });
 
+    // Retry logic for network issues
+    let completion;
+    let lastError;
+    const maxRetries = 3;
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`AI completion attempt ${attempt}/${maxRetries}`);
+        
+        completion = await aiClient.chat.completions.create({
+          model: selectedModel,
+          messages: [
+            {
+              role: "system",
+              content: `You are an expert data analyst specializing in Olympic weightlifting performance analytics. 
+                        Your expertise lies in extracting meaningful insights from complex training and competition 
+                        datasets to drive evidence-based decisions.
+
+                        ANALYTICAL FRAMEWORK:
+
+                        Data Processing & Quality Assessment:
+                        - Identify data quality issues, outliers, and statistical anomalies
+                        - Normalize and standardize metrics across different measurement systems
+                        - Apply appropriate statistical methods for time-series and performance data
+                        - Handle missing data points and assess data completeness
+
+                        Statistical Analysis & Pattern Recognition:
+                        - Perform trend analysis using moving averages, regression models, and seasonal decomposition
+                        - Calculate performance variability, consistency metrics, and statistical confidence intervals
+                        - Identify significant changes using statistical tests and effect size calculations
+                        - Detect performance plateaus, breakouts, and regression patterns
+
+                        Performance Modeling & Prediction:
+                        - Build predictive models for 1RM estimation and performance forecasting
+                        - Analyze load-velocity relationships and power output curves
+                        - Calculate training stress indices and recovery patterns
+                        - Model adaptation rates and training response variability
+
+                        Comparative & Cohort Analysis:
+                        - Benchmark individual performance against peer groups and historical data
+                        - Perform percentile rankings and z-score calculations for context
+                        - Analyze performance relative to bodyweight, age, and experience level
+                        - Compare training methodologies and their effectiveness
+
+                        Risk Assessment & Load Management:
+                        - Calculate training load ratios and identify overreaching indicators
+                        - Analyze injury risk factors through movement quality metrics
+                        - Monitor fatigue markers and readiness indicators
+                        - Assess training monotony and strain metrics
+
+                        REPORTING STANDARDS:
+                        - Present findings with statistical significance and confidence levels
+                        - Include effect sizes and practical significance alongside statistical measures
+                        - Provide uncertainty estimates and confidence intervals for predictions
+                        - Use data visualization best practices for clear communication
+                        - Support all recommendations with quantitative evidence and statistical backing
+
+                        Always approach analysis with scientific rigor, acknowledging limitations in the data 
+                        and providing context for the confidence level of your insights.
+                        
+                        RESPONSE FRAMEWORK:
+
+                        Data in the same day should be referred to as sets, data on different days should be referred to as sessions.
+                        
+                        12/31/1969 (55 years old) is the default birthday in the system, if no date of birth is provided. If this is the 
+                        date of birth for the user, do not include age in your analysis.
+                        
+                        Your recommendations should be specific and actionable, and should be based on the data provided.
+                        Do not make recommendations that are not supported by the data. If there is not enough data to make a recommendation,
+                        do not make a recommendation.
+                        
+                        Format your response in clear sections with headings in plain text. Do not use markdown. Write the
+                        headers in bold, then the information in paragraph format below it.`
+            },
+            {
+              role: "user",
+              content: `Please analyze the following athlete performance data and provide insights:
+
+                        ${analysisData}
+
+                        Please provide:
+                        1. Key performance insights
+                        2. Trends observed in the data
+                        3. Areas for improvement
+                        4. Strengths identified
+                        5. Specific recommendations
+                        6. Summary of the analysis
+                        
+                        Do not add any opinions that aren't directly supported by the data.`
+            }
+          ],
+          max_tokens: modelConfig.maxTokens,
+          temperature: modelConfig.temperature,
+        });
+        
+        // If we get here, the request succeeded
+        console.log(`AI completion successful on attempt ${attempt}`);
+        break;
+        
+      } catch (error) {
+        lastError = error;
+        console.error(`AI completion attempt ${attempt} failed:`, error instanceof Error ? error.message : error);
+        
+        // If this is the last attempt, we'll throw the error
+        if (attempt === maxRetries) {
+          throw error;
+        }
+        
+        // Wait a bit before retrying (exponential backoff)
+        const waitTime = Math.pow(2, attempt) * 1000; // 2s, 4s, 8s
+        console.log(`Waiting ${waitTime}ms before retry...`);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+      }
+    }
+
+    if (!completion) {
+      throw lastError || new Error('Failed to get completion after all retries');
+    }
+
+    console.log('AI Completion Response:', {
+      choices: completion.choices?.length || 0,
+      firstChoiceContent: completion.choices?.[0]?.message?.content?.substring(0, 100) || 'No content',
+      usage: completion.usage,
+      model: completion.model
+    });
+
+    const analysisContent = completion.choices?.[0]?.message?.content;
+    
+    if (!analysisContent) {
+      console.error('No analysis content generated from AI model');
+      console.error('Full completion object:', JSON.stringify(completion, null, 2));
+    }
+
     return NextResponse.json({
-      analysis: completion.choices[0]?.message?.content || 'No analysis generated',
+      analysis: analysisContent || 'No analysis generated',
       athleteName: selectedAthlete?.fullName || 'All Athletes',
       timeRange,
-      dataPoints: measurements.length
+      dataPoints: measurements.length,
+      model: selectedModel,
+      modelDescription: modelConfig.description
     });
 
   } catch (error) {
     console.error('AI analysis error:', error);
+    console.error('Error details:', {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+      name: error instanceof Error ? error.name : undefined
+    });
     return NextResponse.json(
-      { error: 'Failed to generate AI analysis' },
+      { error: 'Failed to generate AI analysis', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     );
   }
@@ -227,7 +299,7 @@ function prepareAnalysisData(measurements: ExerciseMeasurement[], exercises: Exe
     if (!acc[measurement.exerciseId]) {
       acc[measurement.exerciseId] = [];
     }
-    acc[measurement.exerciseId].push(measurement);
+    acc[measurement.exerciseId]!.push(measurement);
     return acc;
   }, {} as Record<string, ExerciseMeasurement[]>);
 
@@ -244,7 +316,10 @@ function prepareAnalysisData(measurements: ExerciseMeasurement[], exercises: Exe
   analysisText += `Exercises Performed: ${Object.keys(exerciseGroups).length}\n`;
   if (measurements.length > 0) {
     const lastMeasurement = measurements[measurements.length - 1];
-    analysisText += `Date Range: ${measurements[0]?.completedDate?.split('T')[0]} to ${lastMeasurement?.completedDate?.split('T')[0]}\n\n`;
+    const firstMeasurement = measurements[0];
+    if (lastMeasurement && firstMeasurement) {
+      analysisText += `Date Range: ${firstMeasurement.completedDate?.split('T')[0]} to ${lastMeasurement.completedDate?.split('T')[0]}\n\n`;
+    }
   }
 
   // Analyze each exercise
