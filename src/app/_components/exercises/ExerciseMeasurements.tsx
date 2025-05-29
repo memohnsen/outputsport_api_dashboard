@@ -16,6 +16,26 @@ interface ExerciseMeasurementsProps {
   onExerciseChange?: (exerciseId: string | null) => void;
 }
 
+// Add hook for screen size
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkIsMobile = () => {
+      setIsMobile(window.innerWidth < 640);
+    };
+
+    // Check on mount
+    checkIsMobile();
+
+    // Listen for resize
+    window.addEventListener('resize', checkIsMobile);
+    return () => window.removeEventListener('resize', checkIsMobile);
+  }, []);
+
+  return isMobile;
+}
+
 export default function ExerciseMeasurements({ selectedAthlete, timeRange, aggregationMode, selectedExercise: propSelectedExercise, onExerciseChange }: ExerciseMeasurementsProps) {
   const [measurements, setMeasurements] = useState<ExerciseMeasurement[]>([]);
   const [allMeasurements, setAllMeasurements] = useState<ExerciseMeasurement[]>([]);
@@ -24,14 +44,15 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange, aggre
   const [loading, setLoading] = useState(true);
   const [initialLoading, setInitialLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedExercise, setSelectedExercise] = useState<string | null>(null);
+  const [selectedExercise, setSelectedExercise] = useState<string | null>(propSelectedExercise || null);
   const [chartData, setChartData] = useState<any[]>([]);
-  const [visibleMetrics, setVisibleMetrics] = useState<Record<string, boolean>>({});
+  const [visibleMetrics, setVisibleMetrics] = useState<{ [key: string]: boolean }>({});
   const [secondaryAxisMetrics, setSecondaryAxisMetrics] = useState<string[]>([]);
   const [primaryAxisMetrics, setPrimaryAxisMetrics] = useState<string[]>([]);
   // Add sorting state for the measurement details table
   const [tableSortColumn, setTableSortColumn] = useState<string | null>(null);
   const [tableSortDirection, setTableSortDirection] = useState<'asc' | 'desc'>('asc');
+  const isMobile = useIsMobile();
 
   // Get date range based on selected time range
   const getDateRange = () => {
@@ -1274,15 +1295,15 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange, aggre
         </div>
       ) : chartData.length > 0 ? (
         <div>
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="h-96 w-full md:w-3/4 bg-[#1a1a1a]/80 rounded-lg p-2">
+          <div className="flex flex-col lg:flex-row gap-4">
+            <div className="h-80 sm:h-96 w-full lg:w-3/4 bg-[#1a1a1a]/80 rounded-lg p-2 sm:p-4">
               <ResponsiveContainer width="100%" height="100%">
                 <RechartsLineChart
                   data={chartData}
                   margin={{
                     top: 10,
-                    right: 40, // Increased to make room for secondary Y-axis
-                    left: 20,
+                    right: isMobile ? 10 : 40,
+                    left: isMobile ? 10 : 20,
                     bottom: 30,
                   }}
                 >
@@ -1290,6 +1311,7 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange, aggre
                   <XAxis 
                     dataKey="date" 
                     stroke="#8C8C8C"
+                    fontSize={isMobile ? 10 : 12}
                     tickFormatter={(value) => {
                       // If we're in an aggregated view, show appropriate labels
                       if (timeRange !== 'today') {
@@ -1306,6 +1328,7 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange, aggre
                     yAxisId="left"
                     stroke="#8C8C8C"
                     domain={['auto', 'auto']}
+                    fontSize={isMobile ? 10 : 12}
                   />
                   
                   {/* Secondary Y-axis */}
@@ -1314,103 +1337,31 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange, aggre
                     orientation="right"
                     stroke="#A19543"
                     domain={['auto', 'auto']}
+                    fontSize={isMobile ? 10 : 12}
                   />
                   
                   <Tooltip 
                     contentStyle={{ 
-                      backgroundColor: 'rgba(40, 40, 40, 0.95)',
+                      backgroundColor: 'rgba(26, 26, 26, 0.95)',
                       borderColor: '#8C8C8C',
-                      color: 'white'
-                    }}
-                    formatter={(value, name, props) => {
-                      if (typeof value !== 'number') return [value, name];
-                      
-                      // Extract the metric field name from the dataKey
-                      const metricField = String(props.dataKey);
-                      
-                      // Use proper scientific units based on measurement type
-                      const metricFieldToUnit: Record<string, string> = {
-                        // Force metrics - Newtons (N)
-                        'meanForce': 'N',
-                        'peakForce': 'N',
-                        'relativeForce': 'N/kg',
-                        'relativeMeanForce': 'N/kg',
-                        'relativePeakForce': 'N/kg',
-                        'bestMeanForce': 'N',
-                        
-                        // Velocity metrics - meters per second (m/s)
-                        'meanVelocity': 'm/s',
-                        'peakVelocity': 'm/s',
-                        'meanPropulsiveVelocity': 'm/s',
-                        'eccentricMeanVelocity': 'm/s',
-                        'eccentricPeakVelocity': 'm/s',
-                        'bestMeanVelocity': 'm/s',
-                        
-                        // Power metrics - Watts (W)
-                        'meanPower': 'W',
-                        'peakPower': 'W',
-                        'relativeMeanPower': 'W/kg',
-                        'relativePeakPower': 'W/kg',
-                        'bestMeanPower': 'W',
-                        
-                        // Acceleration metrics - meters per second squared (m/s²)
-                        'meanAcceleration': 'm/s²',
-                        'peakAcceleration': 'm/s²',
-                        
-                        // Impulse metrics - Newton seconds (N·s)
-                        'meanConcentricImpulse': 'N·s',
-                        
-                        // Other common metrics
-                        'estimatedOneRepMax': 'kg',
-                        'weight': 'kg',
-                        'timeUnderTension': 's',
-                        'totalWork': 'J',
-                        'repCount': 'reps'
-                      };
-                      
-                      // Get the known unit for this field
-                      const unit = metricFieldToUnit[metricField] || getShorthandUnit(getMetricUnit(metricField));
-                      
-                      // Format the value with 2 decimal places and add the unit
-                      const formattedValue = unit 
-                        ? `${value.toFixed(2)} ${unit}` 
-                        : value.toFixed(2);
-                      
-                      return [formattedValue, String(name)];
-                    }}
-                    labelFormatter={(label, payload) => {
-                      // Add measurement count info for aggregated views
-                      if (timeRange !== 'today' && payload && payload.length > 0 && payload[0]?.payload) {
-                        const measurement = payload[0].payload;
-                        if (measurement && typeof measurement.measurementCount === 'number') {
-                          const count = measurement.measurementCount;
-                          let timeUnit = '';
-                          
-                          switch(timeRange) {
-                            case '7days':
-                              timeUnit = 'Day';
-                              break;
-                            case '30days':
-                              timeUnit = 'Week';
-                              break;
-                            default:
-                              timeUnit = 'Month';
-                              break;
-                          }
-                          
-                          return `${timeUnit}: ${label} (${count} measurement${count !== 1 ? 's' : ''})`;
-                        }
-                      }
-                      
-                      if (timeRange === 'today') {
-                        return `Time: ${label}`;
-                      }
-                      
-                      return `Date: ${label}`;
-                    }}
+                      color: 'white',
+                      fontSize: isMobile ? '12px' : '14px',
+                      borderRadius: '8px'
+                    }} 
+                    formatter={(value: any, name: string) => [
+                      `${parseFloat(value).toFixed(2)}`,
+                      formatMetricName(name)
+                    ]}
+                    labelFormatter={(label) => `${label}`}
                   />
-                  
-                  {/* Render lines based on which axis they belong to */}
+                  <Legend 
+                    wrapperStyle={{ 
+                      color: '#8C8C8C',
+                      fontSize: isMobile ? '11px' : '12px'
+                    }} 
+                    formatter={(value) => formatMetricName(value)}
+                  />
+
                   {getUniqueMetricFields()
                     .filter(field => visibleMetrics[field] !== false)
                     .slice(0, 5) // Limit to first 5 selected metrics only
@@ -1428,11 +1379,11 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange, aggre
                           type="monotone" 
                           dataKey={field} 
                           stroke={colors[index % colors.length]} 
-                          activeDot={{ r: 8 }} 
+                          activeDot={{ r: isMobile ? 6 : 8 }} 
                           name={formatMetricName(field)}
                           connectNulls={true}
                           yAxisId={yAxisId}
-                          strokeWidth={3} // Thicker lines for better visibility
+                          strokeWidth={isMobile ? 2 : 3}
                         />
                       );
                     })
@@ -1441,19 +1392,19 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange, aggre
               </ResponsiveContainer>
             </div>
             
-            <div className="md:w-1/4 bg-[#1a1a1a]/80 rounded-lg p-4 flex-shrink-0">
-              <div className="flex items-center justify-between mb-3">
-                <div className="text-white font-medium">Metrics</div>
-                <div className="flex space-x-2">
+            <div className="w-full lg:w-1/4 bg-[#1a1a1a]/80 rounded-lg p-3 sm:p-4 flex-shrink-0">
+              <div className="flex flex-col sm:flex-row lg:flex-col sm:items-center lg:items-start sm:justify-between lg:justify-start mb-3">
+                <div className="text-white font-medium mb-2 sm:mb-0 lg:mb-2">Metrics</div>
+                <div className="flex flex-wrap gap-2">
                   <button 
                     onClick={selectAllMetrics}
-                    className="px-2 py-1 text-xs bg-[#887D2B]/80 hover:bg-[#887D2B] text-white rounded"
+                    className="px-3 py-2 text-xs sm:text-sm bg-[#887D2B]/80 hover:bg-[#887D2B] text-white rounded transition-colors"
                   >
                     Select All
                   </button>
                   <button 
                     onClick={deselectAllMetrics}
-                    className="px-2 py-1 text-xs bg-[#333]/80 hover:bg-[#444] text-white rounded"
+                    className="px-3 py-2 text-xs sm:text-sm bg-[#333]/80 hover:bg-[#444] text-white rounded transition-colors"
                   >
                     Deselect All
                   </button>

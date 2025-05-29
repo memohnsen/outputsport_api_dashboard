@@ -90,11 +90,14 @@ export default function OutputDashboard() {
   return (
     <div className="grid grid-cols-1 gap-6">
       <div>
-        <div className="mb-6 flex flex-wrap items-center justify-between">
-          <div className="flex flex-col space-y-2 sm:flex-row sm:items-center sm:space-x-4 sm:space-y-0">
-            <div className="w-full max-w-xs sm:w-64">
+        <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex flex-col space-y-3 sm:flex-row sm:items-center sm:space-x-4 sm:space-y-0">
+            <div className="w-full sm:w-64 lg:max-w-xs">
+              <label className="mb-1 block text-sm font-medium text-[#8C8C8C] sm:hidden">
+                Select Athlete
+              </label>
               <select
-                className="w-full rounded-md border-[#8C8C8C]/20 bg-[#1a1a1a] px-3 py-2 text-white focus:border-[#887D2B] focus:ring focus:ring-[#887D2B]/30"
+                className="w-full rounded-md border-[#8C8C8C]/20 bg-[#1a1a1a] px-3 py-3 sm:py-2 text-white focus:border-[#887D2B] focus:ring focus:ring-[#887D2B]/30 text-base sm:text-sm"
                 value={selectedAthlete?.id ?? ''}
                 onChange={handleAthleteChange}
                 disabled={isLoadingAthletes}
@@ -112,27 +115,37 @@ export default function OutputDashboard() {
               </select>
             </div>
           </div>
-          <div className="mt-4 sm:mt-0 flex gap-2">
-            <select
-              className="w-full rounded-md border-[#8C8C8C]/20 bg-[#1a1a1a] px-3 py-2 text-white focus:border-[#887D2B] focus:ring focus:ring-[#887D2B]/30"
-              value={timeRange}
-              onChange={handleTimeRangeChange}
-            >
-              <option value="today">Today</option>
-              <option value="7days">Last 7 Days</option>
-              <option value="30days">Last 30 Days</option>
-              <option value="90days">Last 90 Days</option>
-              <option value="year">Last Year</option>
-              <option value="all">All Time</option>
-            </select>
-            <select
-              className="w-full rounded-md border-[#8C8C8C]/20 bg-[#1a1a1a] px-3 py-2 text-white focus:border-[#887D2B] focus:ring focus:ring-[#887D2B]/30"
-              value={aggregationMode}
-              onChange={handleAggregationModeChange}
-            >
-              <option value="aggregate">Aggregate</option>
-              <option value="showAll">Show All</option>
-            </select>
+          <div className="flex flex-col gap-3 sm:flex-row sm:gap-2">
+            <div className="w-full sm:w-auto">
+              <label className="mb-1 block text-sm font-medium text-[#8C8C8C] sm:hidden">
+                Time Range
+              </label>
+              <select
+                className="w-full rounded-md border-[#8C8C8C]/20 bg-[#1a1a1a] px-3 py-3 sm:py-2 text-white focus:border-[#887D2B] focus:ring focus:ring-[#887D2B]/30 text-base sm:text-sm"
+                value={timeRange}
+                onChange={handleTimeRangeChange}
+              >
+                <option value="today">Today</option>
+                <option value="7days">Last 7 Days</option>
+                <option value="30days">Last 30 Days</option>
+                <option value="90days">Last 90 Days</option>
+                <option value="year">Last Year</option>
+                <option value="all">All Time</option>
+              </select>
+            </div>
+            <div className="w-full sm:w-auto">
+              <label className="mb-1 block text-sm font-medium text-[#8C8C8C] sm:hidden">
+                View Mode
+              </label>
+              <select
+                className="w-full rounded-md border-[#8C8C8C]/20 bg-[#1a1a1a] px-3 py-3 sm:py-2 text-white focus:border-[#887D2B] focus:ring focus:ring-[#887D2B]/30 text-base sm:text-sm"
+                value={aggregationMode}
+                onChange={handleAggregationModeChange}
+              >
+                <option value="aggregate">Aggregate</option>
+                <option value="showAll">Show All</option>
+              </select>
+            </div>
           </div>
         </div>
       </div>

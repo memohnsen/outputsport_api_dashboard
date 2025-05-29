@@ -13,6 +13,8 @@ export default function AthletesList() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<SortOption>('firstName');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
     async function fetchAthletes() {
@@ -33,11 +35,23 @@ export default function AthletesList() {
     void fetchAthletes();
   }, []);
 
-  // Sort athletes whenever the athletes array or sort option changes
+  // Sort and filter athletes whenever the athletes array, sort option, search term, or sort order changes
   useEffect(() => {
     if (!athletes.length) return;
 
-    const sorted = [...athletes];
+    // First filter by search term
+    let filtered = athletes;
+    if (searchTerm) {
+      filtered = athletes.filter(athlete => 
+        athlete.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        athlete.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        athlete.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (athlete.externalId && athlete.externalId.toLowerCase().includes(searchTerm.toLowerCase()))
+      );
+    }
+
+    // Then sort
+    const sorted = [...filtered];
     
     switch (sortBy) {
       case 'firstName':
@@ -54,9 +68,14 @@ export default function AthletesList() {
         });
         break;
     }
+
+    // Apply sort order
+    if (sortOrder === 'desc') {
+      sorted.reverse();
+    }
     
     setSortedAthletes(sorted);
-  }, [athletes, sortBy]);
+  }, [athletes, sortBy, sortOrder, searchTerm]);
 
   const handleSortChange = (option: SortOption) => {
     setSortBy(option);
@@ -107,27 +126,48 @@ export default function AthletesList() {
 
   return (
     <div className="w-full">
-      <div className="mb-6 flex flex-wrap items-center justify-end">        
-        <div className="flex items-center">
-          <p className="mr-4 text-[#8C8C8C]">Sort by:</p>
-          <div className="flex space-x-2">
-            <button 
-              className={`rounded px-3 py-1 text-sm font-medium ${sortBy === 'firstName' ? 'bg-[#887D2B] text-white' : 'bg-white/10 text-[#8C8C8C] hover:bg-white/20'}`}
-              onClick={() => handleSortChange('firstName')}
+      <div className="mb-6 sm:mb-8">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex-1 max-w-md">
+            <label htmlFor="search" className="sr-only">Search athletes</label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <svg className="h-4 w-4 sm:h-5 sm:w-5 text-[#8C8C8C]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </div>
+              <input
+                type="text"
+                id="search"
+                placeholder="Search athletes..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-9 pr-3 py-3 sm:py-2 text-base sm:text-sm rounded-md border border-[#8C8C8C]/20 bg-[#1a1a1a] text-white placeholder-[#8C8C8C] focus:border-[#887D2B] focus:ring focus:ring-[#887D2B]/30"
+              />
+            </div>
+          </div>
+          
+          <div className="flex flex-col gap-3 sm:flex-row sm:gap-2 sm:items-center">
+            <div className="w-full sm:w-auto">
+              <label className="mb-1 block text-sm font-medium text-[#8C8C8C] sm:hidden">
+                Sort by
+              </label>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as SortOption)}
+                className="w-full sm:w-auto px-3 py-3 sm:py-2 text-base sm:text-sm rounded-md border border-[#8C8C8C]/20 bg-[#1a1a1a] text-white focus:border-[#887D2B] focus:ring focus:ring-[#887D2B]/30"
+              >
+                <option value="firstName">Sort by First Name</option>
+                <option value="lastName">Sort by Last Name</option>
+                <option value="age">Sort by Age</option>
+              </select>
+            </div>
+            <button
+              onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+              className="w-full sm:w-auto px-3 py-3 sm:py-2 text-base sm:text-sm rounded-md border border-[#8C8C8C]/20 bg-[#1a1a1a] text-white hover:bg-[#212121] focus:border-[#887D2B] focus:ring focus:ring-[#887D2B]/30 transition-colors"
+              title={`Currently sorting ${sortOrder === 'asc' ? 'ascending' : 'descending'}`}
             >
-              First Name
-            </button>
-            <button 
-              className={`rounded px-3 py-1 text-sm font-medium ${sortBy === 'lastName' ? 'bg-[#887D2B] text-white' : 'bg-white/10 text-[#8C8C8C] hover:bg-white/20'}`}
-              onClick={() => handleSortChange('lastName')}
-            >
-              Last Name
-            </button>
-            <button 
-              className={`rounded px-3 py-1 text-sm font-medium ${sortBy === 'age' ? 'bg-[#887D2B] text-white' : 'bg-white/10 text-[#8C8C8C] hover:bg-white/20'}`}
-              onClick={() => handleSortChange('age')}
-            >
-              Age
+              {sortOrder === 'asc' ? '↑ Ascending' : '↓ Descending'}
             </button>
           </div>
         </div>
@@ -142,30 +182,30 @@ export default function AthletesList() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {sortedAthletes.map(athlete => (
           <div 
             key={athlete.id} 
-            className="rounded-xl bg-[#1a1a1a] p-6 backdrop-blur-sm transition-all hover:bg-[#212121] border border-[#8C8C8C]/10"
+            className="rounded-xl bg-[#1a1a1a] p-4 sm:p-6 backdrop-blur-sm transition-all hover:bg-[#212121] border border-[#8C8C8C]/10"
           >
             <div className="mb-4 flex items-center">
-              <div className="mr-4 flex h-16 w-16 items-center justify-center rounded-full bg-[#887D2B]/30 text-center">
-                <span className="text-2xl font-bold text-white">
+              <div className="mr-3 sm:mr-4 flex h-12 w-12 sm:h-16 sm:w-16 items-center justify-center rounded-full bg-[#887D2B]/30 text-center">
+                <span className="text-lg sm:text-2xl font-bold text-white">
                   {athlete.firstName[0]}{athlete.lastName[0]}
                 </span>
               </div>
-              <div>
-                <h3 className="text-xl font-bold text-white">{athlete.fullName}</h3>
+              <div className="min-w-0 flex-1">
+                <h3 className="text-lg sm:text-xl font-bold text-white truncate">{athlete.fullName}</h3>
                 <p className="text-sm text-[#8C8C8C]">{calculateAge(athlete.dateOfBirth)} years old</p>
               </div>
             </div>
             
-            <div className="mb-4 grid grid-cols-2 gap-2">
-              <div className="rounded bg-[#0D0D0D]/90 p-2">
+            <div className="mb-4 grid grid-cols-1 gap-2">
+              <div className="rounded bg-[#0D0D0D]/90 p-3">
                 <p className="text-xs text-[#8C8C8C]">External ID</p>
                 <p className="truncate text-sm text-white">{athlete.externalId ?? 'N/A'}</p>
               </div>
-              <div className="rounded bg-[#0D0D0D]/90 p-2">
+              <div className="rounded bg-[#0D0D0D]/90 p-3">
                 <p className="text-xs text-[#8C8C8C]">Date of Birth</p>
                 <p className="text-sm text-white">{formatDate(athlete.dateOfBirth)}</p>
               </div>
@@ -173,7 +213,7 @@ export default function AthletesList() {
             
             <Link 
               href={`/?athlete=${athlete.id}`}
-              className="mt-2 block w-full rounded-md bg-[#887D2B] px-4 py-2 text-center text-sm font-medium text-white hover:bg-[#776c25]"
+              className="mt-2 block w-full rounded-md bg-[#887D2B] px-4 py-3 sm:py-2 text-center text-base sm:text-sm font-medium text-white hover:bg-[#776c25] transition-colors"
             >
               View Performance
             </Link>
