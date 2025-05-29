@@ -1325,7 +1325,7 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange, aggre
           className="px-4 py-2 bg-[#887D2B] text-white rounded hover:bg-[#776c25] disabled:bg-[#444] disabled:text-[#8C8C8C] disabled:cursor-not-allowed text-sm font-medium transition-colors"
           title={measurements.length === 0 ? "No data to download" : `Download JSON data (${measurements.length} measurements)`}
         >
-          Download
+          Download as JSON
         </button>
       </div>
       
