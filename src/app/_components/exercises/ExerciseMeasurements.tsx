@@ -29,6 +29,9 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange, aggre
   const [visibleMetrics, setVisibleMetrics] = useState<Record<string, boolean>>({});
   const [secondaryAxisMetrics, setSecondaryAxisMetrics] = useState<string[]>([]);
   const [primaryAxisMetrics, setPrimaryAxisMetrics] = useState<string[]>([]);
+  // Add sorting state for the measurement details table
+  const [tableSortColumn, setTableSortColumn] = useState<string | null>(null);
+  const [tableSortDirection, setTableSortDirection] = useState<'asc' | 'desc'>('asc');
 
   // Get date range based on selected time range
   const getDateRange = () => {
@@ -708,7 +711,7 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange, aggre
           const getWeekNumber = (key: string | undefined): number => {
             if (!key) return 0;
             const match = key.match(/W(\d+)/);
-            return match ? parseInt(match[1]) : 0;
+            return match && match[1] ? parseInt(match[1]) : 0;
           };
           
           const weekA = getWeekNumber(a.groupKey);
@@ -800,7 +803,7 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange, aggre
       });
       
       // Group metrics by order of magnitude
-      const metricsByMagnitude: Record<string, number[]> = {};
+      const metricsByMagnitude: Record<string, string[]> = {};
       Object.entries(metricMaxValues).forEach(([metric, maxValue]) => {
         if (maxValue === 0) return; // Skip metrics with max value of 0
         
@@ -809,7 +812,7 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange, aggre
         if (!metricsByMagnitude[magnitude]) {
           metricsByMagnitude[magnitude] = [];
         }
-        metricsByMagnitude[magnitude].push(parseInt(metric));
+        metricsByMagnitude[magnitude].push(metric);
       });
       
       console.log('Metrics grouped by magnitude:', metricsByMagnitude);
@@ -1123,6 +1126,49 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange, aggre
     
     return standardizedUnit ? `${name} (${standardizedUnit})` : name;
   };
+
+  // Add table sorting functionality
+  const handleTableSort = (column: string) => {
+    if (tableSortColumn === column) {
+      setTableSortDirection(tableSortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setTableSortColumn(column);
+      setTableSortDirection('asc');
+    }
+  };
+
+  // Create sorted chart data for the table
+  const sortedChartData = [...chartData].sort((a, b) => {
+    if (!tableSortColumn) return 0;
+    
+    let aValue = a[tableSortColumn];
+    let bValue = b[tableSortColumn];
+    
+    // Handle special cases for different column types
+    if (tableSortColumn === 'date') {
+      // Sort by fullDate for proper chronological ordering
+      aValue = new Date(a.fullDate || a.rawDate).getTime();
+      bValue = new Date(b.fullDate || b.rawDate).getTime();
+    } else if (tableSortColumn === 'athleteName') {
+      // String comparison for athlete names
+      aValue = String(aValue || '').toLowerCase();
+      bValue = String(bValue || '').toLowerCase();
+    } else {
+      // Numeric comparison for metric fields
+      if (aValue === null || aValue === undefined) return 1;
+      if (bValue === null || bValue === undefined) return -1;
+      
+      // Convert to numbers for numeric metrics
+      if (typeof aValue === 'string') aValue = parseFloat(aValue) || 0;
+      if (typeof bValue === 'string') bValue = parseFloat(bValue) || 0;
+    }
+    
+    if (tableSortDirection === 'asc') {
+      return aValue > bValue ? 1 : -1;
+    } else {
+      return aValue < bValue ? 1 : -1;
+    }
+  });
 
   if (initialLoading) {
     return (
@@ -1475,7 +1521,7 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange, aggre
               {selectedAthlete && ` for ${selectedAthlete.fullName}`}
             </h4>
             
-            {chartData.length === 0 ? (
+            {sortedChartData.length === 0 ? (
               <div className="rounded-md bg-amber-500/20 p-4 text-center text-white">
                 <p>No measurement data available for {getCurrentExerciseName()}</p>
               </div>
@@ -1484,20 +1530,43 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange, aggre
                 <table className="w-full min-w-full table-auto">
                   <thead>
                     <tr className="border-b border-[#8C8C8C]/30">
-                      <th className="px-4 py-2 text-left font-medium text-[#8C8C8C]">Date</th>
-                      <th className="px-4 py-2 text-left font-medium text-[#8C8C8C]">Athlete</th>
+                      <th 
+                        className="cursor-pointer px-4 py-2 text-left font-medium text-[#8C8C8C] hover:text-white"
+                        onClick={() => handleTableSort('date')}
+                      >
+                        Date
+                        {tableSortColumn === 'date' && (
+                          <span className="ml-1">{tableSortDirection === 'asc' ? '↑' : '↓'}</span>
+                        )}
+                      </th>
+                      <th 
+                        className="cursor-pointer px-4 py-2 text-left font-medium text-[#8C8C8C] hover:text-white"
+                        onClick={() => handleTableSort('athleteName')}
+                      >
+                        Athlete
+                        {tableSortColumn === 'athleteName' && (
+                          <span className="ml-1">{tableSortDirection === 'asc' ? '↑' : '↓'}</span>
+                        )}
+                      </th>
                       {getUniqueMetricFields().map(field => (
                         // Only show table columns for visible metrics
                         visibleMetrics[field] !== false && (
-                          <th key={field} className="px-4 py-2 text-left font-medium text-[#8C8C8C]">
+                          <th 
+                            key={field} 
+                            className="cursor-pointer px-4 py-2 text-left font-medium text-[#8C8C8C] hover:text-white"
+                            onClick={() => handleTableSort(field)}
+                          >
                             {formatMetricNameOnly(field)}
+                            {tableSortColumn === field && (
+                              <span className="ml-1">{tableSortDirection === 'asc' ? '↑' : '↓'}</span>
+                            )}
                           </th>
                         )
                       ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {chartData.map((dataPoint, index) => (
+                    {sortedChartData.map((dataPoint, index) => (
                       <tr 
                         key={dataPoint.id || dataPoint.groupKey || index} 
                         className="border-b border-[#8C8C8C]/10 hover:bg-[#0D0D0D]/70"
