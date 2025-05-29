@@ -1191,6 +1191,76 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange, aggre
     }
   });
 
+  // Download JSON data function
+  const downloadJSONData = () => {
+    try {
+      // Get current exercise name for metadata
+      const currentExerciseName = getCurrentExerciseName();
+      
+      // Create metadata object
+      const metadata = {
+        exportDate: new Date().toISOString(),
+        athlete: selectedAthlete ? {
+          id: selectedAthlete.id,
+          name: selectedAthlete.fullName,
+          firstName: selectedAthlete.firstName,
+          lastName: selectedAthlete.lastName
+        } : null,
+        exercise: selectedExercise ? {
+          id: selectedExercise,
+          name: currentExerciseName
+        } : { name: 'All Movements' },
+        timeRange: {
+          selected: timeRange,
+          description: getTimeRangeText()
+        },
+        aggregationMode: aggregationMode,
+        totalMeasurements: measurements.length,
+        processedDataPoints: chartData.length
+      };
+
+      // Create the export data structure
+      const exportData = {
+        metadata,
+        rawMeasurements: measurements,
+        processedChartData: chartData,
+        availableExercises: filteredExercises.map(ex => ({
+          id: ex.id,
+          name: ex.name,
+          category: ex.category,
+          metrics: ex.metrics
+        }))
+      };
+
+      // Create filename
+      const athleteName = selectedAthlete ? selectedAthlete.fullName.replace(/\s+/g, '_') : 'All_Athletes';
+      const exerciseName = selectedExercise 
+        ? exercises.find(e => e.id === selectedExercise)?.name?.replace(/\s+/g, '_') || 'Unknown_Exercise'
+        : 'All_Movements';
+      const timestamp = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+      
+      const filename = `${athleteName}_${exerciseName}_${timeRange}_${timestamp}.json`;
+
+      // Create and download the file
+      const jsonString = JSON.stringify(exportData, null, 2);
+      const blob = new Blob([jsonString], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      console.log(`Downloaded ${filename} with ${measurements.length} measurements`);
+    } catch (error) {
+      console.error('Error downloading JSON data:', error);
+      alert('Error downloading data. Please try again.');
+    }
+  };
+
   if (initialLoading) {
     return (
       <div className="w-full rounded-xl bg-[#1a1a1a] p-6 backdrop-blur-sm border border-[#8C8C8C]/10">
@@ -1245,9 +1315,19 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange, aggre
 
   return (
     <div className="w-full rounded-xl bg-[#1a1a1a] p-6 backdrop-blur-sm border border-[#8C8C8C]/10">
-      <h3 className="mb-4 text-xl font-semibold text-white">
-        {selectedAthlete ? `${selectedAthlete.fullName}'s ` : ''}Exercise Measurements
-      </h3>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-2 sm:gap-4">
+        <h3 className="text-xl font-semibold text-white">
+          {selectedAthlete ? `${selectedAthlete.fullName}'s ` : ''}Exercise Measurements
+        </h3>
+        <button
+          onClick={downloadJSONData}
+          disabled={measurements.length === 0}
+          className="px-4 py-2 bg-[#887D2B] text-white rounded hover:bg-[#776c25] disabled:bg-[#444] disabled:text-[#8C8C8C] disabled:cursor-not-allowed text-sm font-medium transition-colors"
+          title={measurements.length === 0 ? "No data to download" : `Download JSON data (${measurements.length} measurements)`}
+        >
+          Download
+        </button>
+      </div>
       
       <div className="mb-6">
         <label htmlFor="exercise-select" className="mb-2 block text-sm font-medium text-[#8C8C8C]">
