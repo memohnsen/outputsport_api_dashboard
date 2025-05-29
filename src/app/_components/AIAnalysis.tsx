@@ -259,9 +259,6 @@ export default function AIAnalysis({ selectedAthlete, timeRange, selectedExercis
             Click "Generate AI Analysis" to get insights on {selectedAthlete ? `${selectedAthlete.fullName}'s` : 'all athletes'} performance data
             for {selectedExercise ? selectedExercise : 'all exercises'} in the {timeRange} time period.
           </p>
-          <p className="text-[#8C8C8C]/60 text-xs sm:text-sm">
-            Using: <span className="text-[#887D2B]">{getModelDisplayName(selectedModel)}</span>
-          </p>
         </div>
       )}
     </div>
