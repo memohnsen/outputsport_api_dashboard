@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import ExerciseMeasurements from './exercises/ExerciseMeasurements';
 import MetricsOverview from './MetricsOverview';
+import PhysicsFormulasHelper from './PhysicsFormulasHelper';
 import AIAnalysis from './AIAnalysis';
 import type { Athlete } from '@/services/outputSports.client';
 import { getAthletes } from '@/services/outputSports.client';
@@ -151,6 +152,8 @@ export default function OutputDashboard() {
       </div>
       
       <MetricsOverview />
+      
+      <PhysicsFormulasHelper />
       
       <AIAnalysis selectedAthlete={selectedAthlete} timeRange={timeRange} selectedExercise={selectedExercise} />
       

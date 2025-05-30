@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@clerk/nextjs": "^6.19.4",
+    "@heroicons/react": "^2.2.0",
     "@nivo/bar": "^0.97.0",
     "@nivo/core": "^0.97.0",
     "@nivo/line": "^0.97.0",
