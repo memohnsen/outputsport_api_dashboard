@@ -5,7 +5,7 @@ import { getExerciseMeasurements, getExerciseMetadata } from '@/services/outputS
 import type { ExerciseMetadata, ExerciseMeasurement, Athlete } from '@/services/outputSports.client';
 import { LineChart as RechartsLineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
-type TimeRange = 'today' | '7days' | '30days' | '90days' | 'year' | 'all';
+type TimeRange = 'today' | '7days' | '30days' | '90days' | 'year' | 'all' | 'custom';
 type AggregationMode = 'aggregate' | 'showAll';
 
 interface ExerciseMeasurementsProps {
@@ -14,6 +14,8 @@ interface ExerciseMeasurementsProps {
   aggregationMode: AggregationMode;
   selectedExercise?: string | null;
   onExerciseChange?: (exerciseId: string | null) => void;
+  customStartDate?: string;
+  customEndDate?: string;
 }
 
 // Add hook for screen size
@@ -36,7 +38,15 @@ function useIsMobile() {
   return isMobile;
 }
 
-export default function ExerciseMeasurements({ selectedAthlete, timeRange, aggregationMode, selectedExercise: propSelectedExercise, onExerciseChange }: ExerciseMeasurementsProps) {
+export default function ExerciseMeasurements({ 
+  selectedAthlete, 
+  timeRange, 
+  aggregationMode, 
+  selectedExercise: propSelectedExercise, 
+  onExerciseChange,
+  customStartDate,
+  customEndDate 
+}: ExerciseMeasurementsProps) {
   const [measurements, setMeasurements] = useState<ExerciseMeasurement[]>([]);
   const [allMeasurements, setAllMeasurements] = useState<ExerciseMeasurement[]>([]);
   const [exercises, setExercises] = useState<ExerciseMetadata[]>([]);
@@ -56,6 +66,15 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange, aggre
 
   // Get date range based on selected time range
   const getDateRange = () => {
+    // Handle custom date range
+    if (timeRange === 'custom' && customStartDate && customEndDate) {
+      console.log(`Using custom date range: ${customStartDate} to ${customEndDate}`);
+      return {
+        startDateStr: customStartDate,
+        endDateStr: customEndDate
+      };
+    }
+    
     // Get current date in local timezone
     const now = new Date();
     
@@ -231,6 +250,72 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange, aggre
   // Function to filter measurements by time range
   const filterMeasurementsByTimeRange = (measurements: ExerciseMeasurement[], currentTimeRange: TimeRange) => {
     setLoading(true);
+    
+    // Handle custom date range
+    if (currentTimeRange === 'custom' && customStartDate && customEndDate) {
+      console.log(`Filtering measurements for custom date range: ${customStartDate} to ${customEndDate}`);
+      
+      try {
+        const startDate = new Date(customStartDate + 'T00:00:00.000Z');
+        const endDate = new Date(customEndDate + 'T23:59:59.999Z');
+        
+        console.log(`Custom range timestamps: ${startDate.toISOString()} to ${endDate.toISOString()}`);
+        
+        const filteredByDate = measurements.filter(measurement => {
+          const measurementDate = new Date(measurement.completedDate);
+          const isInRange = measurementDate >= startDate && measurementDate <= endDate;
+          return isInRange;
+        });
+        
+        console.log(`Filtered to ${filteredByDate.length} measurements for custom range`);
+        
+        // Update measurements state with filtered data
+        setMeasurements(filteredByDate);
+        
+        // Get unique exercise IDs from the filtered measurements
+        const exerciseIdsWithData = new Set(filteredByDate.map(m => m.exerciseId));
+        
+        // Filter the exercises metadata to only include exercises with data
+        const availableExercises = exercises.filter(exercise => 
+          exerciseIdsWithData.has(exercise.id)
+        );
+        
+        console.log(`Found ${availableExercises.length} exercises with data for custom range`);
+        setFilteredExercises(availableExercises);
+        
+        // Update selected exercise if needed
+        if (selectedExercise && !exerciseIdsWithData.has(selectedExercise)) {
+          if (availableExercises.length > 0 && availableExercises[0]?.id) {
+            console.log(`Selected exercise ${selectedExercise} has no data in this range, switching to ${availableExercises[0].id}`);
+            const newExerciseId = availableExercises[0].id;
+            setSelectedExercise(newExerciseId);
+            if (onExerciseChange) {
+              onExerciseChange(newExerciseId);
+            }
+          } else {
+            setSelectedExercise(null);
+            if (onExerciseChange) {
+              onExerciseChange(null);
+            }
+          }
+        } else if (!selectedExercise && availableExercises.length > 0 && availableExercises[0]?.id) {
+          const newExerciseId = availableExercises[0].id;
+          setSelectedExercise(newExerciseId);
+          if (onExerciseChange) {
+            onExerciseChange(newExerciseId);
+          }
+        }
+        
+        setError(null);
+        setLoading(false);
+        return;
+      } catch (err) {
+        console.error('Error filtering custom date range:', err);
+        setError('Error filtering data by custom date range');
+        setLoading(false);
+        return;
+      }
+    }
     
     // Get today's date for consistent date handling
     const today = new Date();
@@ -439,7 +524,7 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange, aggre
       
       filterMeasurementsByTimeRange(allMeasurements, timeRange);
     }
-  }, [timeRange, allMeasurements, exercises]);
+  }, [timeRange, allMeasurements, exercises, customStartDate, customEndDate]);
 
   // Update chart data when selected exercise changes or measurements are loaded
   useEffect(() => {

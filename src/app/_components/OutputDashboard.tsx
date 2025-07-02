@@ -10,7 +10,7 @@ import { getAthletes } from '@/services/outputSports.client';
 import { useSearchParams } from 'next/navigation';
 import { api } from "@/trpc/react";
 
-type TimeRange = 'today' | '7days' | '30days' | '90days' | 'year' | 'all';
+type TimeRange = 'today' | '7days' | '30days' | '90days' | 'year' | 'all' | 'custom';
 type AggregationMode = 'aggregate' | 'showAll';
 
 export default function OutputDashboard() {
@@ -23,6 +23,8 @@ export default function OutputDashboard() {
   const [selectedExercise, setSelectedExercise] = useState<string | null>(null);
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [reportName, setReportName] = useState('');
+  const [customStartDate, setCustomStartDate] = useState<string>('');
+  const [customEndDate, setCustomEndDate] = useState<string>('');
   const searchParams = useSearchParams();
 
   const saveReportMutation = api.reports.save.useMutation({
@@ -48,6 +50,8 @@ export default function OutputDashboard() {
       athleteName: selectedAthlete?.fullName ?? 'All Athletes',
       exercise: selectedExercise,
       timeRange: timeRange,
+      customStartDate: timeRange === 'custom' ? customStartDate : undefined,
+      customEndDate: timeRange === 'custom' ? customEndDate : undefined,
     });
   };
   
@@ -77,6 +81,8 @@ export default function OutputDashboard() {
     const athleteId = searchParams.get('athlete');
     const urlTimeRange = searchParams.get('timeRange');
     const urlExercise = searchParams.get('exercise');
+    const urlCustomStartDate = searchParams.get('customStartDate');
+    const urlCustomEndDate = searchParams.get('customEndDate');
     
     if (athleteId && athletes.length > 0) {
       const athlete = athletes.find(a => a.id === athleteId);
@@ -87,16 +93,38 @@ export default function OutputDashboard() {
       }
     }
 
-    if (urlTimeRange && ['today', '7days', '30days', '90days', 'year', 'all'].includes(urlTimeRange)) {
+    if (urlTimeRange && ['today', '7days', '30days', '90days', 'year', 'all', 'custom'].includes(urlTimeRange)) {
       setTimeRange(urlTimeRange as TimeRange);
     }
 
     if (urlExercise) {
       setSelectedExercise(urlExercise);
     }
+
+    if (urlCustomStartDate && urlCustomEndDate) {
+      setCustomStartDate(urlCustomStartDate);
+      setCustomEndDate(urlCustomEndDate);
+    }
   }, [searchParams, athletes]);
 
-  const handleAthleteChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+  // Initialize custom date range to default (today - 30 days through today)
+  useEffect(() => {
+    const today = new Date();
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(today.getDate() - 30);
+    
+    const formatDate = (date: Date) => {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+    
+    setCustomStartDate(formatDate(thirtyDaysAgo));
+    setCustomEndDate(formatDate(today));
+  }, []);
+
+  const handleAthleteChange = (event: any) => {
     const athleteId = event.target.value;
     if (athleteId) {
       const athlete = athletes.find(a => a.id === athleteId) ?? null;
@@ -107,11 +135,19 @@ export default function OutputDashboard() {
     }
   };
 
-  const handleTimeRangeChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+  const handleTimeRangeChange = (event: any) => {
     setTimeRange(event.target.value as TimeRange);
   };
 
-  const handleAggregationModeChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+  const handleCustomStartDateChange = (event: any) => {
+    setCustomStartDate(event.target.value);
+  };
+
+  const handleCustomEndDateChange = (event: any) => {
+    setCustomEndDate(event.target.value);
+  };
+
+  const handleAggregationModeChange = (event: any) => {
     setAggregationMode(event.target.value as AggregationMode);
   };
 
@@ -123,6 +159,7 @@ export default function OutputDashboard() {
       case '90days': return 'Last 90 Days';
       case 'year': return 'Last Year';
       case 'all': return 'All Time';
+      case 'custom': return `Custom (${customStartDate} to ${customEndDate})`;
       default: return 'Last 7 Days';
     }
   };
@@ -171,8 +208,38 @@ export default function OutputDashboard() {
                 <option value="90days">Last 90 Days</option>
                 <option value="year">Last Year</option>
                 <option value="all">All Time</option>
+                <option value="custom">Custom</option>
               </select>
             </div>
+            
+            {/* Custom Date Range Inputs */}
+            {timeRange === 'custom' && (
+              <>
+                <div className="w-full sm:w-auto">
+                  <label className="mb-1 block text-sm font-medium text-[#8C8C8C] sm:hidden">
+                    Start Date
+                  </label>
+                  <input
+                    type="date"
+                    value={customStartDate}
+                    onChange={handleCustomStartDateChange}
+                    className="w-full rounded-md border-[#8C8C8C]/20 bg-[#1a1a1a] px-3 py-3 sm:py-2 text-white focus:border-[#887D2B] focus:ring focus:ring-[#887D2B]/30 text-base sm:text-sm"
+                  />
+                </div>
+                <div className="w-full sm:w-auto">
+                  <label className="mb-1 block text-sm font-medium text-[#8C8C8C] sm:hidden">
+                    End Date
+                  </label>
+                  <input
+                    type="date"
+                    value={customEndDate}
+                    onChange={handleCustomEndDateChange}
+                    className="w-full rounded-md border-[#8C8C8C]/20 bg-[#1a1a1a] px-3 py-3 sm:py-2 text-white focus:border-[#887D2B] focus:ring focus:ring-[#887D2B]/30 text-base sm:text-sm"
+                  />
+                </div>
+              </>
+            )}
+            
             <div className="w-full sm:w-auto">
               <label className="mb-1 block text-sm font-medium text-[#8C8C8C] sm:hidden">
                 View Mode
@@ -202,7 +269,13 @@ export default function OutputDashboard() {
       
       <PhysicsFormulasHelper />
       
-      <AIAnalysis selectedAthlete={selectedAthlete} timeRange={timeRange} selectedExercise={selectedExercise} />
+      <AIAnalysis 
+        selectedAthlete={selectedAthlete} 
+        timeRange={timeRange} 
+        selectedExercise={selectedExercise}
+        customStartDate={customStartDate}
+        customEndDate={customEndDate}
+      />
       
       <div className="grid grid-cols-1">
         {isLoadingAthlete ? (
@@ -217,6 +290,8 @@ export default function OutputDashboard() {
             aggregationMode={aggregationMode}
             selectedExercise={selectedExercise}
             onExerciseChange={setSelectedExercise}
+            customStartDate={customStartDate}
+            customEndDate={customEndDate}
           />
         )}
       </div>

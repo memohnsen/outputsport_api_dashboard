@@ -9,6 +9,8 @@ interface SavedReport {
   athleteName: string;
   exercise: string | null;
   timeRange: string;
+  customStartDate?: string;
+  customEndDate?: string;
   createdAt: Date;
 }
 
@@ -24,6 +26,8 @@ export const reportsRouter = createTRPCRouter({
       athleteName: z.string(),
       exercise: z.string().nullable(),
       timeRange: z.string(),
+      customStartDate: z.string().optional(),
+      customEndDate: z.string().optional(),
     }))
     .mutation(async ({ input }) => {
       const report: SavedReport = {
@@ -33,6 +37,8 @@ export const reportsRouter = createTRPCRouter({
         athleteName: input.athleteName,
         exercise: input.exercise,
         timeRange: input.timeRange,
+        customStartDate: input.customStartDate,
+        customEndDate: input.customEndDate,
         createdAt: new Date(),
       };
       savedReports.push(report);

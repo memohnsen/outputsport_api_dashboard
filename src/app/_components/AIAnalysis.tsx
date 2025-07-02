@@ -8,6 +8,8 @@ interface AIAnalysisProps {
   selectedAthlete: Athlete | null;
   timeRange: string;
   selectedExercise: string | null;
+  customStartDate?: string;
+  customEndDate?: string;
 }
 
 interface AnalysisResponse {
@@ -19,7 +21,7 @@ interface AnalysisResponse {
   modelDescription?: string;
 }
 
-export default function AIAnalysis({ selectedAthlete, timeRange, selectedExercise }: AIAnalysisProps) {
+export default function AIAnalysis({ selectedAthlete, timeRange, selectedExercise, customStartDate, customEndDate }: AIAnalysisProps) {
   const [analysis, setAnalysis] = useState<AnalysisResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -40,6 +42,8 @@ export default function AIAnalysis({ selectedAthlete, timeRange, selectedExercis
           timeRange: timeRange,
           exerciseId: selectedExercise,
           model: selectedModel,
+          customStartDate: timeRange === 'custom' ? customStartDate : undefined,
+          customEndDate: timeRange === 'custom' ? customEndDate : undefined,
         }),
       });
 

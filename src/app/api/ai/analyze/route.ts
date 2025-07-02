@@ -47,7 +47,7 @@ interface ExerciseMeasurement {
 
 export async function POST(request: NextRequest) {
   try {
-    const { athleteId, timeRange, exerciseId, model } = await request.json();
+    const { athleteId, timeRange, exerciseId, model, customStartDate, customEndDate } = await request.json();
 
     // Use provided model or default, ensuring it's a valid model
     const selectedModel: AIModel = (model && model in MODEL_CONFIGS) ? model : DEFAULT_ANALYSIS_MODEL;
@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
     const selectedAthlete = athleteId ? athletes.find(a => a.id === athleteId) || null : null;
 
     // Calculate date range
-    const { startDate, endDate } = getDateRange(timeRange);
+    const { startDate, endDate } = getDateRange(timeRange, customStartDate, customEndDate);
 
     // Fetch measurements
     const measurements = await getExerciseMeasurements(
@@ -246,7 +246,18 @@ export async function POST(request: NextRequest) {
   }
 }
 
-function getDateRange(timeRange: string) {
+function getDateRange(timeRange: string, customStartDate?: string, customEndDate?: string) {
+  // Handle custom date range
+  if (timeRange === 'custom' && customStartDate && customEndDate) {
+    const startDate = new Date(customStartDate + 'T00:00:00.000Z');
+    const endDate = new Date(customEndDate + 'T23:59:59.999Z');
+    
+    console.log(`AI Analysis custom date range: ${customStartDate} to ${customEndDate}`);
+    console.log(`Start: ${startDate.toISOString().split('T')[0]}, End: ${endDate.toISOString().split('T')[0]}`);
+    
+    return { startDate, endDate };
+  }
+
   const endDate = new Date();
   const startDate = new Date(endDate); // Create a proper copy
 

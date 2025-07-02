@@ -5,7 +5,7 @@ import { api } from "@/trpc/react";
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
-type TimeRange = 'today' | '7days' | '30days' | '90days' | 'year' | 'all';
+type TimeRange = 'today' | '7days' | '30days' | '90days' | 'year' | 'all' | 'custom';
 
 interface SavedReport {
   id: string;
@@ -14,6 +14,8 @@ interface SavedReport {
   athleteName: string;
   exercise: string | null;
   timeRange: string;
+  customStartDate?: string;
+  customEndDate?: string;
   createdAt: Date;
 }
 
@@ -29,7 +31,7 @@ export default function ReportsPage() {
     },
   });
 
-  const getTimeRangeLabel = (timeRange: string) => {
+  const getTimeRangeLabel = (timeRange: string, customStartDate?: string, customEndDate?: string) => {
     switch(timeRange) {
       case 'today': return 'Today';
       case '7days': return 'Last 7 Days';
@@ -37,6 +39,11 @@ export default function ReportsPage() {
       case '90days': return 'Last 90 Days';
       case 'year': return 'Last Year';
       case 'all': return 'All Time';
+      case 'custom': 
+        if (customStartDate && customEndDate) {
+          return `Custom (${customStartDate} to ${customEndDate})`;
+        }
+        return 'Custom';
       default: return timeRange;
     }
   };
@@ -49,6 +56,10 @@ export default function ReportsPage() {
     params.set('timeRange', report.timeRange);
     if (report.exercise) {
       params.set('exercise', report.exercise);
+    }
+    if (report.timeRange === 'custom' && report.customStartDate && report.customEndDate) {
+      params.set('customStartDate', report.customStartDate);
+      params.set('customEndDate', report.customEndDate);
     }
     
     router.push(`/?${params.toString()}`);
@@ -125,7 +136,7 @@ export default function ReportsPage() {
                         </p>
                       )}
                       <p>
-                        <span className="font-medium">Time Range:</span> {getTimeRangeLabel(report.timeRange)}
+                        <span className="font-medium">Time Range:</span> {getTimeRangeLabel(report.timeRange, report.customStartDate, report.customEndDate)}
                       </p>
                       <p>
                         <span className="font-medium">Created:</span> {new Date(report.createdAt).toLocaleDateString()}
