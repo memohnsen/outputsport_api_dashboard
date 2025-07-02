@@ -8,6 +8,7 @@ import AIAnalysis from './AIAnalysis';
 import type { Athlete } from '@/services/outputSports.client';
 import { getAthletes } from '@/services/outputSports.client';
 import { useSearchParams } from 'next/navigation';
+import { api } from "@/trpc/react";
 
 type TimeRange = 'today' | '7days' | '30days' | '90days' | 'year' | 'all';
 type AggregationMode = 'aggregate' | 'showAll';
@@ -20,7 +21,35 @@ export default function OutputDashboard() {
   const [timeRange, setTimeRange] = useState<TimeRange>('7days');
   const [aggregationMode, setAggregationMode] = useState<AggregationMode>('aggregate');
   const [selectedExercise, setSelectedExercise] = useState<string | null>(null);
+  const [showSaveModal, setShowSaveModal] = useState(false);
+  const [reportName, setReportName] = useState('');
   const searchParams = useSearchParams();
+
+  const saveReportMutation = api.reports.save.useMutation({
+    onSuccess: () => {
+      setShowSaveModal(false);
+      setReportName('');
+      alert('Report saved successfully!');
+    },
+    onError: (error: any) => {
+      alert('Failed to save report: ' + error.message);
+    },
+  });
+
+  const handleSaveReport = () => {
+    if (!reportName.trim()) {
+      alert('Please enter a report name');
+      return;
+    }
+
+    saveReportMutation.mutate({
+      name: reportName.trim(),
+      athleteId: selectedAthlete?.id ?? null,
+      athleteName: selectedAthlete?.fullName ?? 'All Athletes',
+      exercise: selectedExercise,
+      timeRange: timeRange,
+    });
+  };
   
   // Fetch all athletes on component mount
   useEffect(() => {
@@ -43,9 +72,11 @@ export default function OutputDashboard() {
     void fetchAthletes();
   }, []);
 
-  // Handle athlete selection from URL query parameter
+  // Handle URL query parameters (from loaded reports)
   useEffect(() => {
     const athleteId = searchParams.get('athlete');
+    const urlTimeRange = searchParams.get('timeRange');
+    const urlExercise = searchParams.get('exercise');
     
     if (athleteId && athletes.length > 0) {
       const athlete = athletes.find(a => a.id === athleteId);
@@ -54,6 +85,14 @@ export default function OutputDashboard() {
         console.log('Found athlete from URL:', athlete.fullName);
         setSelectedAthlete(athlete);
       }
+    }
+
+    if (urlTimeRange && ['today', '7days', '30days', '90days', 'year', 'all'].includes(urlTimeRange)) {
+      setTimeRange(urlTimeRange as TimeRange);
+    }
+
+    if (urlExercise) {
+      setSelectedExercise(urlExercise);
     }
   }, [searchParams, athletes]);
 
@@ -147,6 +186,14 @@ export default function OutputDashboard() {
                 <option value="showAll">Show All</option>
               </select>
             </div>
+            <div className="w-full sm:w-auto">
+              <button
+                onClick={() => setShowSaveModal(true)}
+                className="w-full bg-[#887D2B] hover:bg-[#9a8e30] text-white px-4 py-3 sm:py-2 rounded-md transition-colors text-base sm:text-sm font-medium"
+              >
+                Save Report
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -173,6 +220,53 @@ export default function OutputDashboard() {
           />
         )}
       </div>
+
+      {/* Save Report Modal */}
+      {showSaveModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-[#1a1a1a] rounded-xl p-6 w-full max-w-md border border-[#8C8C8C]/20">
+            <h3 className="text-xl font-semibold text-white mb-4">Save Report</h3>
+            
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-[#8C8C8C] mb-2">
+                Report Name
+              </label>
+              <input
+                type="text"
+                value={reportName}
+                onChange={(e) => setReportName(e.target.value)}
+                placeholder="Enter report name..."
+                className="w-full rounded-md border-[#8C8C8C]/20 bg-[#0D0D0D] px-3 py-2 text-white focus:border-[#887D2B] focus:ring focus:ring-[#887D2B]/30"
+              />
+            </div>
+
+            <div className="mb-6 text-sm text-[#8C8C8C]">
+              <p><strong>Athlete:</strong> {selectedAthlete?.fullName ?? 'All Athletes'}</p>
+              {selectedExercise && <p><strong>Exercise:</strong> {selectedExercise}</p>}
+              <p><strong>Time Range:</strong> {getTimeRangeLabel()}</p>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={handleSaveReport}
+                disabled={saveReportMutation.isPending || !reportName.trim()}
+                className="flex-1 bg-[#887D2B] hover:bg-[#9a8e30] disabled:bg-[#5a5a5a] disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg transition-colors"
+              >
+                {saveReportMutation.isPending ? 'Saving...' : 'Save'}
+              </button>
+              <button
+                onClick={() => {
+                  setShowSaveModal(false);
+                  setReportName('');
+                }}
+                className="flex-1 bg-[#8C8C8C] hover:bg-[#a0a0a0] text-white px-4 py-2 rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 } 
