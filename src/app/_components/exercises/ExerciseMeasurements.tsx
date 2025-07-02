@@ -5,7 +5,7 @@ import { getExerciseMeasurements, getExerciseMetadata } from '@/services/outputS
 import type { ExerciseMetadata, ExerciseMeasurement, Athlete } from '@/services/outputSports.client';
 import { LineChart as RechartsLineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
-type TimeRange = 'today' | '7days' | '30days' | '90days' | 'year' | 'all';
+type TimeRange = 'today' | '7days' | '30days' | '90days' | 'year' | 'all' | 'custom';
 type AggregationMode = 'aggregate' | 'showAll';
 
 interface ExerciseMeasurementsProps {
@@ -14,6 +14,8 @@ interface ExerciseMeasurementsProps {
   aggregationMode: AggregationMode;
   selectedExercise?: string | null;
   onExerciseChange?: (exerciseId: string | null) => void;
+  customStartDate?: string;
+  customEndDate?: string;
 }
 
 // Add hook for screen size
@@ -36,7 +38,7 @@ function useIsMobile() {
   return isMobile;
 }
 
-export default function ExerciseMeasurements({ selectedAthlete, timeRange, aggregationMode, selectedExercise: propSelectedExercise, onExerciseChange }: ExerciseMeasurementsProps) {
+export default function ExerciseMeasurements({ selectedAthlete, timeRange, aggregationMode, selectedExercise: propSelectedExercise, onExerciseChange, customStartDate, customEndDate }: ExerciseMeasurementsProps) {
   const [measurements, setMeasurements] = useState<ExerciseMeasurement[]>([]);
   const [allMeasurements, setAllMeasurements] = useState<ExerciseMeasurement[]>([]);
   const [exercises, setExercises] = useState<ExerciseMetadata[]>([]);
@@ -104,6 +106,10 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange, aggre
         const limitedDate = new Date(now);
         limitedDate.setDate(now.getDate() - 89);
         startDateStr = formatDateString(limitedDate);
+        break;
+      case 'custom':
+        startDateStr = customStartDate || endDateStr;
+        console.log(`Custom range: ${startDateStr} to ${endDateStr}`);
         break;
       default:
         // Default to 30 days (including today)
@@ -238,7 +244,7 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange, aggre
     
     // Calculate start and end dates based on time range, explicitly ensuring today is included
     let startDate = new Date(today); // Clone today
-    const endDate = new Date(today); // End date is always today
+    let endDate = new Date(today); // End date is typically today, but can be custom
     
     // Set end time to end of day to include all of today's data
     endDate.setHours(23, 59, 59, 999);
@@ -269,6 +275,20 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange, aggre
         // Use 90 days for both year and all-time (based on API limits)
         startDate.setDate(today.getDate() - 89);
         startDate.setHours(0, 0, 0, 0);
+        break;
+      case 'custom':
+        if (customStartDate && customEndDate) {
+          startDate = new Date(customStartDate);
+          startDate.setHours(0, 0, 0, 0);
+          
+          const customEnd = new Date(customEndDate);
+          customEnd.setHours(23, 59, 59, 999);
+          endDate = customEnd;
+        } else {
+          // Fallback to 30 days if custom dates are not provided
+          startDate.setDate(today.getDate() - 29);
+          startDate.setHours(0, 0, 0, 0);
+        }
         break;
       default:
         // Default to 30 days
@@ -439,7 +459,7 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange, aggre
       
       filterMeasurementsByTimeRange(allMeasurements, timeRange);
     }
-  }, [timeRange, allMeasurements, exercises]);
+  }, [timeRange, allMeasurements, exercises, customStartDate, customEndDate]);
 
   // Update chart data when selected exercise changes or measurements are loaded
   useEffect(() => {
@@ -892,6 +912,7 @@ export default function ExerciseMeasurements({ selectedAthlete, timeRange, aggre
       case '90days': return 'Last 90 days';
       case 'year': return 'Last year';
       case 'all': return 'All time';
+      case 'custom': return `Custom (${customStartDate} to ${customEndDate})`;
       default: return 'Last 30 days';
     }
   };

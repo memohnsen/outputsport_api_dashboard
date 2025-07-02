@@ -204,11 +204,21 @@ export default function OutputDashboard() {
         )}
       </div>
       
-      <MetricsOverview />
+      <MetricsOverview 
+        timeRange={timeRange}
+        customStartDate={customStartDate}
+        customEndDate={customEndDate}
+      />
       
       <PhysicsFormulasHelper />
       
-      <AIAnalysis selectedAthlete={selectedAthlete} timeRange={timeRange} selectedExercise={selectedExercise} />
+      <AIAnalysis 
+        selectedAthlete={selectedAthlete} 
+        timeRange={timeRange} 
+        selectedExercise={selectedExercise}
+        customStartDate={customStartDate}
+        customEndDate={customEndDate}
+      />
       
       <div className="grid grid-cols-1">
         {isLoadingAthlete ? (
@@ -223,6 +233,8 @@ export default function OutputDashboard() {
             aggregationMode={aggregationMode}
             selectedExercise={selectedExercise}
             onExerciseChange={setSelectedExercise}
+            customStartDate={customStartDate}
+            customEndDate={customEndDate}
           />
         )}
       </div>
