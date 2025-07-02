@@ -25,6 +25,9 @@ export default async function Home() {
                 <Link href="/athletes" className="text-[#8C8C8C] hover:text-white transition-colors">
                   Athletes
                 </Link>
+                <Link href="/reports" className="text-[#8C8C8C] hover:text-white transition-colors">
+                  Reports
+                </Link>
                 <SignedIn>
                   <div className="ml-4">
                     <UserButton afterSignOutUrl="/" />
@@ -40,6 +43,9 @@ export default async function Home() {
                   </Link>
                   <Link href="/athletes" className="text-[#8C8C8C] hover:text-white transition-colors text-sm">
                     Athletes
+                  </Link>
+                  <Link href="/reports" className="text-[#8C8C8C] hover:text-white transition-colors text-sm">
+                    Reports
                   </Link>
                 </div>
                 <SignedIn>
