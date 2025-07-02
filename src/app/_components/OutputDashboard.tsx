@@ -9,7 +9,7 @@ import type { Athlete } from '@/services/outputSports.client';
 import { getAthletes } from '@/services/outputSports.client';
 import { useSearchParams } from 'next/navigation';
 
-type TimeRange = 'today' | '7days' | '30days' | '90days' | 'year' | 'all';
+type TimeRange = 'today' | '7days' | '30days' | '90days' | 'year' | 'all' | 'custom';
 type AggregationMode = 'aggregate' | 'showAll';
 
 export default function OutputDashboard() {
@@ -20,7 +20,22 @@ export default function OutputDashboard() {
   const [timeRange, setTimeRange] = useState<TimeRange>('7days');
   const [aggregationMode, setAggregationMode] = useState<AggregationMode>('aggregate');
   const [selectedExercise, setSelectedExercise] = useState<string | null>(null);
+  
+  // Custom date range state
+  const [customStartDate, setCustomStartDate] = useState<string>('');
+  const [customEndDate, setCustomEndDate] = useState<string>('');
+  
   const searchParams = useSearchParams();
+  
+  // Initialize custom date range with default values (today - 30 days to today)
+  useEffect(() => {
+    const today = new Date();
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(today.getDate() - 30);
+    
+    setCustomEndDate(today.toISOString().split('T')[0]);
+    setCustomStartDate(thirtyDaysAgo.toISOString().split('T')[0]);
+  }, []);
   
   // Fetch all athletes on component mount
   useEffect(() => {
@@ -76,6 +91,14 @@ export default function OutputDashboard() {
     setAggregationMode(event.target.value as AggregationMode);
   };
 
+  const handleCustomStartDateChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setCustomStartDate(event.target.value);
+  };
+
+  const handleCustomEndDateChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setCustomEndDate(event.target.value);
+  };
+
   const getTimeRangeLabel = () => {
     switch(timeRange) {
       case 'today': return 'Today';
@@ -84,6 +107,7 @@ export default function OutputDashboard() {
       case '90days': return 'Last 90 Days';
       case 'year': return 'Last Year';
       case 'all': return 'All Time';
+      case 'custom': return 'Custom Range';
       default: return 'Last 7 Days';
     }
   };
@@ -132,6 +156,7 @@ export default function OutputDashboard() {
                 <option value="90days">Last 90 Days</option>
                 <option value="year">Last Year</option>
                 <option value="all">All Time</option>
+                <option value="custom">Custom</option>
               </select>
             </div>
             <div className="w-full sm:w-auto">
@@ -149,6 +174,34 @@ export default function OutputDashboard() {
             </div>
           </div>
         </div>
+        
+        {/* Custom Date Range Picker */}
+        {timeRange === 'custom' && (
+          <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+            <div className="flex flex-col gap-1">
+              <label className="text-sm font-medium text-[#8C8C8C]">
+                Start Date
+              </label>
+              <input
+                type="date"
+                value={customStartDate}
+                onChange={handleCustomStartDateChange}
+                className="rounded-md border-[#8C8C8C]/20 bg-[#1a1a1a] px-3 py-2 text-white focus:border-[#887D2B] focus:ring focus:ring-[#887D2B]/30 text-sm"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-sm font-medium text-[#8C8C8C]">
+                End Date
+              </label>
+              <input
+                type="date"
+                value={customEndDate}
+                onChange={handleCustomEndDateChange}
+                className="rounded-md border-[#8C8C8C]/20 bg-[#1a1a1a] px-3 py-2 text-white focus:border-[#887D2B] focus:ring focus:ring-[#887D2B]/30 text-sm"
+              />
+            </div>
+          </div>
+        )}
       </div>
       
       <MetricsOverview />
