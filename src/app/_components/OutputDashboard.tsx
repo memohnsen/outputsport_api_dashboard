@@ -23,8 +23,28 @@ export default function OutputDashboard() {
   const [selectedExercise, setSelectedExercise] = useState<string | null>(null);
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [reportName, setReportName] = useState('');
-  const [customStartDate, setCustomStartDate] = useState<string>('');
-  const [customEndDate, setCustomEndDate] = useState<string>('');
+  // Initialize custom dates with default values immediately
+  const getDefaultCustomDates = () => {
+    const today = new Date();
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(today.getDate() - 30);
+    
+    const formatDate = (date: Date) => {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+    
+    return {
+      startDate: formatDate(thirtyDaysAgo),
+      endDate: formatDate(today)
+    };
+  };
+  
+  const defaultDates = getDefaultCustomDates();
+  const [customStartDate, setCustomStartDate] = useState<string>(defaultDates.startDate);
+  const [customEndDate, setCustomEndDate] = useState<string>(defaultDates.endDate);
   const searchParams = useSearchParams();
 
   const saveReportMutation = api.reports.save.useMutation({
@@ -107,22 +127,15 @@ export default function OutputDashboard() {
     }
   }, [searchParams, athletes]);
 
-  // Initialize custom date range to default (today - 30 days through today)
+  // Log the initialized custom date range
   useEffect(() => {
-    const today = new Date();
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(today.getDate() - 30);
-    
-    const formatDate = (date: Date) => {
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, '0');
-      const day = String(date.getDate()).padStart(2, '0');
-      return `${year}-${month}-${day}`;
-    };
-    
-    setCustomStartDate(formatDate(thirtyDaysAgo));
-    setCustomEndDate(formatDate(today));
+    console.log(`Custom date range initialized: ${customStartDate} to ${customEndDate}`);
   }, []);
+
+  // Debug effect to track custom date changes
+  useEffect(() => {
+    console.log(`DASHBOARD: Custom dates changed - timeRange: ${timeRange}, startDate: ${customStartDate}, endDate: ${customEndDate}`);
+  }, [customStartDate, customEndDate, timeRange]);
 
   const handleAthleteChange = (event: any) => {
     const athleteId = event.target.value;
@@ -140,11 +153,15 @@ export default function OutputDashboard() {
   };
 
   const handleCustomStartDateChange = (event: any) => {
-    setCustomStartDate(event.target.value);
+    const newStartDate = event.target.value;
+    console.log(`Custom start date changed to: ${newStartDate}`);
+    setCustomStartDate(newStartDate);
   };
 
   const handleCustomEndDateChange = (event: any) => {
-    setCustomEndDate(event.target.value);
+    const newEndDate = event.target.value;
+    console.log(`Custom end date changed to: ${newEndDate}`);
+    setCustomEndDate(newEndDate);
   };
 
   const handleAggregationModeChange = (event: any) => {

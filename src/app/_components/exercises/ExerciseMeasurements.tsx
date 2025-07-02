@@ -252,22 +252,49 @@ export default function ExerciseMeasurements({
     setLoading(true);
     
     // Handle custom date range
-    if (currentTimeRange === 'custom' && customStartDate && customEndDate) {
+    if (currentTimeRange === 'custom') {
+      console.log(`Custom date range requested - customStartDate: "${customStartDate}", customEndDate: "${customEndDate}"`);
+      
+      if (!customStartDate || !customEndDate) {
+        console.warn('Custom time range selected but dates are not properly set:', { customStartDate, customEndDate });
+        setError('Custom date range selected but dates are not set');
+        setLoading(false);
+        return;
+      }
+      
       console.log(`Filtering measurements for custom date range: ${customStartDate} to ${customEndDate}`);
       
       try {
-        const startDate = new Date(customStartDate + 'T00:00:00.000Z');
-        const endDate = new Date(customEndDate + 'T23:59:59.999Z');
+        // Use local timezone for consistent filtering
+        const startDate = new Date(customStartDate + 'T00:00:00');
+        const endDate = new Date(customEndDate + 'T23:59:59.999');
         
-        console.log(`Custom range timestamps: ${startDate.toISOString()} to ${endDate.toISOString()}`);
+        // Validate the parsed dates
+        if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+          throw new Error(`Invalid date format - start: ${customStartDate}, end: ${customEndDate}`);
+        }
+        
+        console.log(`Custom range timestamps (local): ${startDate.toISOString()} to ${endDate.toISOString()}`);
+        
+        // Debug: Show some sample measurement dates
+        console.log(`Sample measurement dates:`, measurements.slice(0, 3).map(m => ({
+          completed: m.completedDate,
+          parsed: new Date(m.completedDate).toISOString()
+        })));
         
         const filteredByDate = measurements.filter(measurement => {
           const measurementDate = new Date(measurement.completedDate);
           const isInRange = measurementDate >= startDate && measurementDate <= endDate;
+          
+          // Debug log for some measurements
+          if (measurements.indexOf(measurement) < 5) {
+            console.log(`Measurement ${measurement.completedDate}: ${measurementDate.toISOString()}, in range: ${isInRange}`);
+          }
+          
           return isInRange;
         });
         
-        console.log(`Filtered to ${filteredByDate.length} measurements for custom range`);
+        console.log(`CUSTOM FILTER RESULT: Filtered to ${filteredByDate.length} measurements for custom range (${customStartDate} to ${customEndDate})`);
         
         // Update measurements state with filtered data
         setMeasurements(filteredByDate);
@@ -499,7 +526,15 @@ export default function ExerciseMeasurements({
   // Filter measurements when time range changes
   useEffect(() => {
     if (allMeasurements.length > 0) {
-      console.log(`Time range changed to: ${timeRange}, filtering ${allMeasurements.length} measurements...`);
+      console.log(`FILTER EFFECT: Time range changed to: ${timeRange}, customStartDate: ${customStartDate}, customEndDate: ${customEndDate}, filtering ${allMeasurements.length} measurements...`);
+      
+      // Special debug for custom date range
+      if (timeRange === 'custom') {
+        console.log(`DEBUG - Custom date range: ${customStartDate} to ${customEndDate}`);
+        if (!customStartDate || !customEndDate) {
+          console.warn('Custom time range selected but dates are not set:', { customStartDate, customEndDate });
+        }
+      }
       
       // Special debug for "today" - log any measurements that exist for today
       if (timeRange === 'today') {
@@ -523,6 +558,8 @@ export default function ExerciseMeasurements({
       }
       
       filterMeasurementsByTimeRange(allMeasurements, timeRange);
+    } else {
+      console.log(`FILTER EFFECT: No measurements to filter, allMeasurements.length = ${allMeasurements.length}`);
     }
   }, [timeRange, allMeasurements, exercises, customStartDate, customEndDate]);
 
